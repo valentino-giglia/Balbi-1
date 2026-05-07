@@ -1,0 +1,41 @@
+<div class="vacunas-mascota-dialog">
+  <h2 mat-dialog-title>Vacunas – {{ mascotaNombre }}</h2>
+  <mat-dialog-content>
+    @if (loading) {
+      <div class="vacunas-loading">
+        <mat-spinner diameter="40"></mat-spinner>
+        <p>Cargando vacunas...</p>
+      </div>
+    } @else if (error) {
+      <p class="vacunas-error">{{ error }}</p>
+    } @else {
+      <div class="vacunas-actions">
+        <button mat-raised-button color="primary" (click)="agregarVacuna()">
+          <mat-icon>add</mat-icon>
+          Agregar vacuna
+        </button>
+      </div>
+      @if (vacunas.length === 0) {
+        <p class="vacunas-empty">Sin vacunas cargadas.</p>
+      } @else {
+        <ul class="vacunas-list">
+          @for (v of vacunas; track v.id) {
+            <li class="vacuna-item">
+              <span class="vacuna-nombre">{{ v.nombre }}</span>
+              <span class="vacuna-fecha">{{ formatearFecha(v.fechaAplicacion) }}</span>
+              @if (v.proximaDosis) {
+                <span class="vacuna-proxima">Próx.: {{ formatearFecha(v.proximaDosis) }}</span>
+              }
+              <button mat-icon-button (click)="editarVacuna(v)" matTooltip="Editar">
+                <mat-icon>edit</mat-icon>
+              </button>
+            </li>
+          }
+        </ul>
+      }
+    }
+  </mat-dialog-content>
+  <mat-dialog-actions align="end">
+    <button mat-raised-button color="primary" (click)="cerrar()">Cerrar</button>
+  </mat-dialog-actions>
+</div>

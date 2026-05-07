@@ -1,0 +1,240 @@
+<div class="chat-detalle-page">
+  <div class="chat-master-detail">
+    <!-- Sidebar: listado de conversaciones -->
+    <aside class="chat-sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-title-row">
+          <h2 class="sidebar-title">Conversaciones</h2>
+        </div>
+
+        <div class="sidebar-filtro-derivados">
+          <mat-chip-listbox [value]="filtroDerivados()" (change)="onFiltroDerivadosChange($event)">
+            <mat-chip-option value="todos">Todos</mat-chip-option>
+            <mat-chip-option value="derivados">
+              <mat-icon matChipAvatar>forward</mat-icon>
+              Derivados
+            </mat-chip-option>
+          </mat-chip-listbox>
+        </div>
+
+        @if (loadingTutores()) {
+          <div class="sidebar-loading">
+            <app-loading-spinner></app-loading-spinner>
+          </div>
+        } @else if (errorTutores()) {
+          <div class="sidebar-error">
+            <mat-icon>error_outline</mat-icon>
+            <span>{{ errorTutores() }}</span>
+          </div>
+        }
+      </div>
+
+      <div class="sidebar-list modern-scrollbar">
+        @for (tutorRow of tutores(); track tutorRow.id) {
+          <div
+            class="sidebar-chat-item"
+            [class.active]="tutor()?.id === tutorRow.id"
+            [class.sidebar-chat-item-derivado]="tutorRow.sn_derivado"
+            (click)="abrirChatDesdeSidebar(tutorRow)">
+            <div class="sidebar-avatar">
+              <div class="avatar-circle">
+                {{ tutorRow.nombre.charAt(0).toUpperCase() || '?' }}
+              </div>
+              <div class="status-indicator" [class.active]="tutorRow.kapso_agent_status === 'ON'"></div>
+            </div>
+            <div class="sidebar-chat-content">
+              <div class="sidebar-chat-header">
+                <h3 class="sidebar-chat-name">{{ tutorRow.nombre || 'Sin nombre' }}</h3>
+                @if (tutorRow.sn_derivado) {
+                  <mat-chip class="chip-derivado" matTooltip="Derivado a secretaría">
+                    <mat-icon matChipAvatar>forward</mat-icon>
+                    Derivado
+                  </mat-chip>
+                }
+                <span class="sidebar-chat-time">Hoy</span>
+              </div>
+              <div class="sidebar-chat-preview">
+                <p>Último mensaje de la conversación...</p>
+              </div>
+              <div class="sidebar-chat-meta">
+                <span class="sidebar-phone">
+                  {{ tutorRow.telefono || 'Sin teléfono' }}
+                  @if (tutorRow.telefono) {
+                    <a [href]="getWhatsAppLink(tutorRow.telefono)" target="_blank" rel="noopener noreferrer" class="whatsapp-link" matTooltip="Abrir en WhatsApp" (click)="$event.stopPropagation()">
+                      <svg class="whatsapp-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path fill="currentColor" d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+                      </svg>
+                    </a>
+                  }
+                </span>
+              </div>
+            </div>
+          </div>
+        }
+
+        @if (!loadingTutores() && tutores().length === 0) {
+          <div class="sidebar-empty">
+            <mat-icon>chat_bubble_outline</mat-icon>
+            <p>No hay conversaciones disponibles</p>
+          </div>
+        }
+      </div>
+    </aside>
+
+    <!-- Columna derecha: detalle del chat seleccionado -->
+    <section class="chat-detail-column">
+      <div class="chat-header-bar">
+        <div class="header-left">
+          <div class="patient-info">
+            <div class="patient-avatar">
+              <div class="avatar-circle">
+                {{ tutor()?.nombre?.charAt(0)?.toUpperCase() || '?' }}
+              </div>
+              <div class="status-dot" [class.active]="tutor()?.kapso_agent_status === 'ON'"></div>
+            </div>
+            <div class="patient-details">
+              <h2 class="patient-name">{{ tutor()?.nombre || 'Chat' }}</h2>
+              <div class="patient-meta">
+                @if (tutor()?.telefono) {
+                  <span class="meta-item meta-phone">
+                    <mat-icon class="meta-icon">phone</mat-icon>
+                    {{ tutor()?.telefono }}
+                    <a [href]="getWhatsAppLink(tutor()?.telefono)" target="_blank" rel="noopener noreferrer" class="whatsapp-link" matTooltip="Abrir en WhatsApp">
+                      <svg class="whatsapp-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path fill="currentColor" d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+                      </svg>
+                    </a>
+                  </span>
+                }
+                @if (tutor()?.dni) {
+                  <span class="meta-item">
+                    <mat-icon class="meta-icon">badge</mat-icon>
+                    DNI: {{ tutor()?.dni }}
+                  </span>
+                }
+                <span class="meta-item status-text" [class.online]="tutor()?.kapso_agent_status === 'ON'">
+                  <mat-icon class="meta-icon">{{ tutor()?.kapso_agent_status === 'ON' ? 'circle' : 'circle' }}</mat-icon>
+                  {{ tutor()?.kapso_agent_status === 'ON' ? 'Agente activo' : 'Agente inactivo' }}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="header-right">
+          <button 
+            mat-stroked-button 
+            color="primary"
+            type="button" 
+            class="turnos-quick-action"
+            (click)="irATutorTurnos()"
+            [disabled]="!tutor()?.id"
+            matTooltip="Ver turnos del tutor">
+            <mat-icon>event_note</mat-icon>
+            Ver turnos
+          </button>
+          <button 
+            mat-stroked-button 
+            color="primary"
+            type="button" 
+            class="agenda-quick-action"
+            (click)="abrirAgendaTurnos()"
+            matTooltip="Agendar turno">
+            <mat-icon>event</mat-icon>
+            Agendar turno
+          </button>
+          <button 
+            mat-stroked-button 
+            type="button" 
+            class="derivar-quick-action"
+            (click)="toggleDerivacion()"
+            [disabled]="!tutor()?.id || loadingDerivacion()"
+            [matTooltip]="tutor()?.sn_derivado ? 'Quitar derivación a secretaría' : 'Derivar a secretaría'">
+            <mat-icon>{{ tutor()?.sn_derivado ? 'undo' : 'forward' }}</mat-icon>
+            {{ tutor()?.sn_derivado ? 'Quitar derivación' : 'Derivar' }}
+          </button>
+          @if (turnosPendientes().length > 0) {
+            <button 
+              mat-icon-button 
+              class="action-button"
+              [matMenuTriggerFor]="turnosMenu"
+              (menuOpened)="menuAbierto.set(true)"
+              (menuClosed)="menuAbierto.set(false)"
+              matTooltip="Turnos pendientes">
+              <mat-icon [matBadge]="turnosPendientes().length" matBadgeColor="warn">notifications</mat-icon>
+            </button>
+            <mat-menu #turnosMenu="matMenu" class="turnos-pendientes-menu">
+              <div class="turnos-menu-header">
+                <h3>Turnos Pendientes</h3>
+                <span class="turnos-count">{{ turnosPendientes().length }} turno(s)</span>
+              </div>
+              <div class="turnos-menu-content">
+                @for (turno of turnosPendientes(); track turno.id) {
+                  <div class="turno-menu-item">
+                    <div class="turno-info">
+                      <div class="turno-fecha">{{ formatFechaHora(turno.horaInicio) }}</div>
+                      <div class="turno-servicio">{{ turno.servicio?.nombre || '-' }}</div>
+                      <div class="turno-profesional">{{ turno.profesional?.nombre || '-' }}</div>
+                    </div>
+                    <div class="turno-actions">
+                      <button 
+                        mat-icon-button 
+                        (click)="confirmarTurno(turno); $event.stopPropagation()"
+                        matTooltip="Confirmar">
+                        <mat-icon>check_circle</mat-icon>
+                      </button>
+                      <button 
+                        mat-icon-button 
+                        (click)="cancelarTurno(turno); $event.stopPropagation()"
+                        matTooltip="Cancelar">
+                        <mat-icon>cancel</mat-icon>
+                      </button>
+                    </div>
+                  </div>
+                }
+              </div>
+            </mat-menu>
+          }
+          <div class="agent-toggle-container">
+            <span class="toggle-label">{{ tutor()?.kapso_agent_status === 'ON' ? 'ON' : 'OFF' }}</span>
+            <mat-slide-toggle
+              [checked]="tutor()?.kapso_agent_status === 'ON'"
+              (change)="toggleKapsoAgentStatus($event)"
+              class="agent-toggle">
+            </mat-slide-toggle>
+          </div>
+        </div>
+      </div>
+
+      <div class="chat-content-wrapper">
+        @if (loading()) {
+          <div class="loading-wrapper">
+            <app-loading-spinner></app-loading-spinner>
+          </div>
+        } @else {
+          @if (error()) {
+            <div class="error-alert">
+              <mat-icon>error_outline</mat-icon>
+              <span>{{ error() }}</span>
+            </div>
+          }
+
+          @if (tutor()?.kapso_phone_number_id && tutor()?.kapso_conversation_id && tutor()?.telefono) {
+            <app-chat-messages 
+              [phoneNumberId]="tutor()!.kapso_phone_number_id!" 
+              [conversationId]="tutor()!.kapso_conversation_id!"
+              [tutorPhoneNumber]="tutor()!.telefono!"
+              (onMessageSent)="onMessageSent()">
+            </app-chat-messages>
+          } @else {
+            <div class="no-chat-state">
+              <mat-icon class="no-chat-icon">chat_bubble_outline</mat-icon>
+              <p class="no-chat-text">No hay información de chat disponible</p>
+              <p class="no-chat-subtext">El tutor necesita tener configurado un número de teléfono y conversación</p>
+            </div>
+          }
+        }
+      </div>
+    </section>
+  </div>
+</div>
+

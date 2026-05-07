@@ -1,0 +1,64 @@
+@switch (type()) {
+  @case ('TEXT') {
+    @if (text()) {
+      <div class="message-text">{{ text() }}</div>
+    }
+  }
+  @case ('IMAGE') {
+    @if (imageUrl()) {
+      <div class="message-media">
+        <img [src]="imageUrl()!" alt="Imagen" class="message-image">
+        @if (text()) {
+          <div class="message-caption">{{ text() }}</div>
+        }
+      </div>
+    } @else {
+      <div class="message-text">{{ text() || 'Imagen' }}</div>
+    }
+  }
+  @case ('AUDIO') {
+    <div class="message-media">
+      @if (audioUrl()) {
+        <audio controls class="message-audio">
+          <source [src]="audioUrl()!" type="audio/mpeg">
+          Tu navegador no soporta audio.
+        </audio>
+      }
+      @if (text()) {
+        <div class="message-text">{{ text() }}</div>
+      }
+    </div>
+  }
+  @case ('VIDEO') {
+    @if (videoUrl()) {
+      <div class="message-media">
+        <video controls class="message-video">
+          <source [src]="videoUrl()!" type="video/mp4">
+          Tu navegador no soporta video.
+        </video>
+        @if (text()) {
+          <div class="message-caption">{{ text() }}</div>
+        }
+      </div>
+    } @else {
+      <div class="message-text">{{ text() || 'Video' }}</div>
+    }
+  }
+  @case ('DOCUMENT') {
+    <div class="message-media">
+      @if (documentUrl()) {
+        <div class="message-document">
+          <mat-icon>description</mat-icon>
+          <a [href]="documentUrl()!" target="_blank" class="document-link">Ver documento</a>
+        </div>
+      }
+      @if (text()) {
+        <div class="message-text">{{ text() }}</div>
+      }
+    </div>
+  }
+  @default {
+    <div class="message-text">{{ text() || 'Mensaje' }}</div>
+  }
+}
+

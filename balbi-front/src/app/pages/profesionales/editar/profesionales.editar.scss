@@ -1,0 +1,90 @@
+.profesionales-editar-page {
+  padding: 24px;
+}
+
+.horarios-container {
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 16px;
+  background-color: #fafafa;
+}
+
+.horario-dia-row {
+  display: flex;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid #e0e0e0;
+  
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+.horario-dia-label {
+  min-width: 60px;
+  font-weight: 500;
+  color: #5f6368;
+  font-size: 14px;
+}
+
+.horario-dia-content {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.no-disponible {
+  color: #9aa0a6;
+  font-size: 14px;
+  margin-right: 8px;
+}
+
+.horario-slot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  background-color: white;
+  border: 1px solid #dadce0;
+  border-radius: 4px;
+}
+
+.time-input {
+  border: none;
+  padding: 4px 8px;
+  font-size: 14px;
+  border-radius: 4px;
+  background-color: transparent;
+  color: #202124;
+  
+  &:focus {
+    outline: 2px solid #1a73e8;
+    outline-offset: 2px;
+  }
+}
+
+.time-separator {
+  color: #5f6368;
+  font-size: 14px;
+}
+
+.btn-agregar-horario,
+.btn-accion-horario {
+  width: 32px;
+  height: 32px;
+  line-height: 32px;
+  
+  mat-icon {
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+    color: #5f6368;
+  }
+  
+  &:hover mat-icon {
+    color: #1a73e8;
+  }
+}
+

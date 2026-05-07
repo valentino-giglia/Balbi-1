@@ -1,0 +1,46 @@
+<div class="mascota-selector-dialog">
+  <h2 mat-dialog-title>Elegir mascota</h2>
+  <mat-dialog-content>
+    <p class="subtitle">
+      Seleccioná la mascota de <strong>{{ data.tutorNombre }}</strong> para ver sus turnos.
+    </p>
+
+    @if (loading) {
+      <div class="loading-wrapper">
+        <mat-progress-spinner mode="indeterminate" diameter="40"></mat-progress-spinner>
+      </div>
+    } @else if (error) {
+      <p class="error-msg">{{ error }}</p>
+    } @else if (mascotas.length === 0) {
+      <p class="empty-msg">Este tutor no tiene mascotas registradas.</p>
+    } @else {
+      <mat-selection-list [multiple]="false" class="mascota-list">
+        @for (m of mascotas; track m.id) {
+          <mat-list-option
+            [selected]="selectedId === m.id"
+            (click)="seleccionar(m.id)">
+            <div class="mascota-item">
+              <div class="mascota-main">
+                <span class="mascota-nombre">{{ m.nombre }}</span>
+                @if (m.especie) {
+                  <span class="mascota-especie">{{ m.especie }}</span>
+                }
+              </div>
+              @if (m.raza) {
+                <span class="mascota-raza">{{ m.raza }}</span>
+              }
+            </div>
+          </mat-list-option>
+        }
+      </mat-selection-list>
+    }
+  </mat-dialog-content>
+
+  <mat-dialog-actions align="end">
+    <button mat-button type="button" (click)="cancelar()">Cancelar</button>
+    <button mat-raised-button color="primary" type="button" (click)="confirmar()" [disabled]="!selectedId">
+      Ir a turnos
+    </button>
+  </mat-dialog-actions>
+</div>
+

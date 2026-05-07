@@ -1,0 +1,87 @@
+<div class="mascotas-editar-page">
+  <div class="row align-items-center mb-3">
+    <div class="col-auto">
+      <h1 class="m-0">Editar mascota</h1>
+    </div>
+  </div>
+
+  @if (loadingData()) {
+    <app-loading-spinner></app-loading-spinner>
+  } @else {
+    @if (error()) {
+      <div class="alert alert-danger mb-3">{{ error() }}</div>
+    }
+
+    <form [formGroup]="form" (ngSubmit)="onSubmit()">
+      <div class="row">
+        <div class="col-md-6 mb-3">
+          <mat-form-field appearance="outline" class="w-100">
+            <mat-label>Tutor *</mat-label>
+            <mat-select formControlName="pacienteID" required>
+              <mat-option [value]="null">Seleccionar tutor</mat-option>
+              @for (t of tutores; track t.id) {
+                <mat-option [value]="t.id">{{ t.nombre }}</mat-option>
+              }
+            </mat-select>
+            @if (form.get('pacienteID')?.hasError('required') && form.get('pacienteID')?.touched) {
+              <mat-error>El tutor es requerido</mat-error>
+            }
+          </mat-form-field>
+        </div>
+
+        <div class="col-md-6 mb-3">
+          <mat-form-field appearance="outline" class="w-100">
+            <mat-label>Nombre de la mascota *</mat-label>
+            <input matInput formControlName="nombre" required placeholder="ej. Firulais">
+            @if (form.get('nombre')?.hasError('required') && form.get('nombre')?.touched) {
+              <mat-error>El nombre es requerido</mat-error>
+            }
+          </mat-form-field>
+        </div>
+
+        <div class="col-md-6 mb-3">
+          <mat-form-field appearance="outline" class="w-100">
+            <mat-label>Especie</mat-label>
+            <input matInput formControlName="especie" placeholder="ej. Canino, Felino">
+          </mat-form-field>
+        </div>
+
+        <div class="col-md-6 mb-3">
+          <mat-form-field appearance="outline" class="w-100">
+            <mat-label>Raza</mat-label>
+            <input matInput formControlName="raza">
+          </mat-form-field>
+        </div>
+
+        <div class="col-md-6 mb-3">
+          <mat-form-field appearance="outline" class="w-100">
+            <mat-label>Fecha de nacimiento</mat-label>
+            <input matInput [matDatepicker]="picker" formControlName="fechaNacimiento">
+            <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
+            <mat-datepicker #picker></mat-datepicker>
+          </mat-form-field>
+        </div>
+
+        <div class="col-md-12 mb-3">
+          <mat-form-field appearance="outline" class="w-100">
+            <mat-label>Notas</mat-label>
+            <textarea matInput formControlName="notas" rows="2"></textarea>
+          </mat-form-field>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col-12">
+          <button mat-raised-button type="button" (click)="cancelar()" class="me-2">Cancelar</button>
+          <button mat-raised-button color="primary" type="submit" [disabled]="loading()">
+            @if (loading()) {
+              <app-loading-spinner></app-loading-spinner>
+            } @else {
+              Guardar
+            }
+          </button>
+        </div>
+      </div>
+    </form>
+  }
+</div>

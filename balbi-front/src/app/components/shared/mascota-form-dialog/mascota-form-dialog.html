@@ -1,0 +1,191 @@
+<div class="mascota-form-dialog">
+  <div class="mfd-header">
+    <div class="mfd-header-avatar" aria-hidden="true">
+      <mat-icon>pets</mat-icon>
+    </div>
+    <div class="mfd-header-text">
+      <h2 mat-dialog-title class="mfd-title">{{ titulo }}</h2>
+      <p class="mfd-subtitle">
+        @if (isEdit) {
+          Datos de la mascota y tutores con acceso a su historial
+        } @else {
+          Completá los datos de la mascota y asigná un tutor titular
+        }
+      </p>
+    </div>
+  </div>
+
+  <mat-dialog-content class="mfd-content">
+    @if (error) {
+      <div class="mfd-error-banner" role="alert">
+        <mat-icon>error_outline</mat-icon>
+        <span>{{ error }}</span>
+      </div>
+    }
+
+    <section class="mfd-section">
+      <span class="mfd-section-label">Datos principales</span>
+      <form [formGroup]="form" class="mfd-form">
+        @if (!tutorFijo && !isEdit) {
+          @if (loadingTutores) {
+            <div class="tutores-loading">
+              <mat-spinner diameter="36" />
+              <span>Cargando tutores…</span>
+            </div>
+          } @else {
+            <mat-form-field appearance="outline" class="w-100">
+              <mat-label>Tutor titular *</mat-label>
+              <mat-select formControlName="pacienteID">
+                <mat-option [value]="null">Seleccionar tutor</mat-option>
+                @for (t of tutores; track t.id) {
+                  <mat-option [value]="t.id">{{ t.nombre }}</mat-option>
+                }
+              </mat-select>
+              @if (form.get('pacienteID')?.hasError('required') && form.get('pacienteID')?.touched) {
+                <mat-error>El tutor es requerido</mat-error>
+              }
+            </mat-form-field>
+          }
+        }
+        <mat-form-field appearance="outline" class="w-100">
+          <mat-label>Nombre *</mat-label>
+          <input matInput formControlName="nombre" placeholder="Ej. Firulais" />
+        </mat-form-field>
+        <div class="mfd-field-row">
+          <mat-form-field appearance="outline" class="mfd-field-half">
+            <mat-label>Especie</mat-label>
+            <input matInput formControlName="especie" placeholder="Canino, Felino…" />
+          </mat-form-field>
+          <mat-form-field appearance="outline" class="mfd-field-half">
+            <mat-label>Raza</mat-label>
+            <input matInput formControlName="raza" placeholder="Opcional" />
+          </mat-form-field>
+        </div>
+        <mat-form-field appearance="outline" class="w-100">
+          <mat-label>Fecha de nacimiento</mat-label>
+          <input matInput [matDatepicker]="picker" formControlName="fechaNacimiento" />
+          <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
+          <mat-datepicker #picker></mat-datepicker>
+        </mat-form-field>
+        <mat-form-field appearance="outline" class="w-100 mfd-notas">
+          <mat-label>Notas</mat-label>
+          <textarea matInput formControlName="notas" rows="3" placeholder="Observaciones clínicas u otras notas"></textarea>
+        </mat-form-field>
+      </form>
+    </section>
+
+    @if (isEdit) {
+      <section class="mfd-section co-tutores-section">
+        <div class="co-tutores-head">
+          <div class="co-tutores-head-icon-wrap">
+            <mat-icon>group</mat-icon>
+          </div>
+          <div class="co-tutores-head-copy">
+            <h3 class="co-tutores-title">Co-tutores</h3>
+            <p class="co-tutores-hint">
+              Otras personas que ven esta mascota, sus turnos e historial desde su propia ficha.
+            </p>
+          </div>
+        </div>
+
+        @if (loadingDetalle) {
+          <div class="co-tutores-loading">
+            <mat-spinner diameter="32" />
+            <span>Cargando…</span>
+          </div>
+        } @else if (detalle) {
+          @if (detalle.coTutores?.length) {
+            <ul class="co-tutores-list" aria-label="Co-tutores actuales">
+              @for (c of detalle.coTutores; track c.id) {
+                <li class="co-tutor-chip">
+                  <mat-icon class="co-tutor-chip-icon">person</mat-icon>
+                  <span class="co-tutor-chip-name">{{ c.nombre }}</span>
+                  <button
+                    type="button"
+                    mat-icon-button
+                    class="co-tutor-chip-remove"
+                    aria-label="Quitar co-tutor"
+                    (click)="quitarCoTutor(c.id)"
+                    [disabled]="loadingCoTutor"
+                  >
+                    <mat-icon>close</mat-icon>
+                  </button>
+                </li>
+              }
+            </ul>
+          } @else {
+            <p class="co-tutores-empty">Todavía no hay co-tutores. Buscá un tutor o creá uno nuevo.</p>
+          }
+
+          <div class="co-tutor-add-card">
+            <span class="co-tutor-add-label">Agregar co-tutor</span>
+            <mat-form-field appearance="outline" class="w-100 co-tutor-search">
+              <mat-icon matPrefix>search</mat-icon>
+              <mat-label>Buscar por nombre o DNI</mat-label>
+              <input
+                matInput
+                [formControl]="coTutorSearchControl"
+                [matAutocomplete]="autoCo"
+                [disabled]="loadingDetalle || loadingCoTutor"
+                placeholder="Escribí para buscar…"
+              />
+              <mat-autocomplete
+                #autoCo="matAutocomplete"
+                [displayWith]="displayTutor"
+                (optionSelected)="onCoTutorSelected($event)"
+              >
+                @for (p of coTutorFiltrados; track p.id) {
+                  <mat-option [value]="p">{{ p.nombre }} — {{ p.dni || 'sin DNI' }}</mat-option>
+                }
+              </mat-autocomplete>
+            </mat-form-field>
+            @if (textoBusquedaCoTutor().length >= 2 && coTutorFiltrados.length === 0) {
+              <p class="co-tutor-sin-resultados">
+                <mat-icon class="co-tutor-sin-res-icon">info</mat-icon>
+                No hay coincidencias. Podés crear un tutor nuevo con el botón de abajo.
+              </p>
+            }
+            <button
+              type="button"
+              mat-stroked-button
+              class="co-tutor-create-btn"
+              color="primary"
+              (click)="abrirCrearCoTutor()"
+              [disabled]="loadingDetalle || loadingCoTutor"
+            >
+              <mat-icon>person_add_alt_1</mat-icon>
+              Crear tutor nuevo
+            </button>
+          </div>
+        }
+      </section>
+    }
+  </mat-dialog-content>
+
+  <mat-dialog-actions class="mfd-actions" align="end">
+    <button
+      mat-stroked-button
+      type="button"
+      class="mfd-btn-cancel"
+      color="warn"
+      (click)="cancelar()"
+      [disabled]="loading"
+    >
+      Cancelar
+    </button>
+    <button
+      mat-flat-button
+      color="primary"
+      class="mfd-btn-save"
+      type="button"
+      (click)="guardar()"
+      [disabled]="loading || form.invalid"
+    >
+      @if (loading) {
+        Guardando…
+      } @else {
+        Guardar
+      }
+    </button>
+  </mat-dialog-actions>
+</div>

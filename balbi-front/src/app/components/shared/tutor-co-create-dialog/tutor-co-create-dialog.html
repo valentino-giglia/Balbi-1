@@ -1,0 +1,51 @@
+<div class="tutor-co-create-dialog">
+  <h2 mat-dialog-title>Nuevo tutor (co-tutor)</h2>
+  <mat-dialog-content>
+    @if (error) {
+      <p class="error-msg">{{ error }}</p>
+    }
+    <p class="hint">
+      Se creará un tutor en el sistema y se vinculará a esta mascota como co-tutor.
+    </p>
+    <form [formGroup]="form">
+      <mat-form-field appearance="outline" class="w-100">
+        <mat-label>Nombre *</mat-label>
+        <input matInput formControlName="nombre" placeholder="Nombre completo" />
+        @if (form.controls.nombre.hasError('required') && form.controls.nombre.touched) {
+          <mat-error>El nombre es requerido</mat-error>
+        }
+      </mat-form-field>
+      <mat-form-field appearance="outline" class="w-100">
+        <mat-label>DNI</mat-label>
+        <input matInput formControlName="dni" />
+      </mat-form-field>
+      <mat-form-field appearance="outline" class="w-100">
+        <mat-label>Teléfono</mat-label>
+        <input matInput formControlName="telefono" />
+      </mat-form-field>
+      <mat-form-field appearance="outline" class="w-100">
+        <mat-label>Email</mat-label>
+        <input matInput type="email" formControlName="email" />
+        @if (form.controls.email.hasError('email') && form.controls.email.touched) {
+          <mat-error>Email inválido</mat-error>
+        }
+      </mat-form-field>
+    </form>
+  </mat-dialog-content>
+  <mat-dialog-actions align="end">
+    <button mat-stroked-button type="button" (click)="cancelar()" [disabled]="loading">Cancelar</button>
+    <button
+      mat-raised-button
+      color="primary"
+      type="button"
+      (click)="guardar()"
+      [disabled]="loading || form.invalid"
+    >
+      @if (loading) {
+        Creando…
+      } @else {
+        Crear y vincular
+      }
+    </button>
+  </mat-dialog-actions>
+</div>

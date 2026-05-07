@@ -1,0 +1,34 @@
+<div class="vacunas-page">
+  <div class="row align-items-center justify-content-between mb-3">
+    <div class="col-auto">
+      <h1 class="m-0">Vacunas</h1>
+    </div>
+    <div class="col-auto">
+      <button mat-raised-button color="primary" (click)="crearVacuna()">
+        <mat-icon>add</mat-icon>
+        Nueva vacuna
+      </button>
+    </div>
+  </div>
+
+  @if (loading()) {
+    <app-loading-spinner></app-loading-spinner>
+  } @else {
+    <app-data-table
+      [columns]="columns"
+      [data]="vacunas()"
+      [loading]="loading()"
+      [showSearch]="true"
+      [showViewAction]="true"
+      [serverSidePagination]="false"
+      [totalCount]="vacunas().length"
+      [currentPageIndex]="0"
+      [pageSize]="10"
+      (onView)="onView($event)"
+      (onEdit)="onEdit($event)"
+      (onDelete)="onDelete($event)"
+      (onPageChange)="onPageChange($event)"
+      (onSearch)="onSearch($event)">
+    </app-data-table>
+  }
+</div>

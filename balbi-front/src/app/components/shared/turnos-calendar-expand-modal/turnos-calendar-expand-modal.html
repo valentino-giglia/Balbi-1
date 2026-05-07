@@ -1,0 +1,133 @@
+<div class="turnos-expand-modal">
+  <header class="turnos-expand-modal__header">
+    <div class="turnos-expand-modal__title-row">
+      <button mat-icon-button (click)="close()" aria-label="Cerrar">
+        <mat-icon>close</mat-icon>
+      </button>
+      <h2 class="turnos-expand-modal__title">Calendario</h2>
+      <span class="turnos-expand-modal__week">{{ turnos.calendarWeekLabel() }}</span>
+    </div>
+
+    <div class="turnos-expand-modal__nav turnos-expand-modal__nav--min">
+      <button mat-icon-button type="button" (click)="turnos.toggleFilters()" matTooltip="{{ turnos.filtersVisible() ? 'Ocultar filtros' : 'Mostrar filtros' }}">
+        <mat-icon>{{ turnos.filtersVisible() ? 'expand_less' : 'expand_more' }}</mat-icon>
+      </button>
+      <button mat-icon-button type="button" (click)="turnos.prevWeek()" matTooltip="Semana anterior">
+        <mat-icon>chevron_left</mat-icon>
+      </button>
+      <button mat-mini-fab color="primary" type="button" (click)="turnos.today()" matTooltip="Hoy">
+        <mat-icon>today</mat-icon>
+      </button>
+      <button mat-icon-button type="button" (click)="turnos.nextWeek()" matTooltip="Semana siguiente">
+        <mat-icon>chevron_right</mat-icon>
+      </button>
+    </div>
+  </header>
+
+  <main class="turnos-expand-modal__body">
+    @if (turnos.loading()) {
+      <div class="turnos-expand-modal__loading">
+        <app-loading-spinner></app-loading-spinner>
+      </div>
+    } @else {
+      @if (turnos.error()) {
+        <div class="turnos-expand-modal__error">{{ turnos.error() }}</div>
+      }
+
+      <div class="turnos-expand-modal__content">
+        <div class="turnos-expand-modal__main">
+          <app-agenda-calendar
+            [viewDate]="turnos.calendarViewDate()"
+            [events]="turnos.calendarEvents()"
+            [weekStartsOn]="1"
+            [startHour]="7"
+            [endHour]="21"
+            [hourHeight]="84"
+            (eventClick)="turnos.onCalendarEventClick($event)"
+            (cellClick)="turnos.onCalendarCellClick($event.day, $event.hour, $event.minute)"
+          ></app-agenda-calendar>
+        </div>
+
+        @if (turnos.filtersVisible()) {
+          <div class="turnos-expand-modal__sidebar">
+            <div class="turnos-expand-modal__filters">
+              <h3 class="turnos-expand-modal__filters-title">Filtros</h3>
+
+              <mat-expansion-panel
+                [expanded]="turnos.serviciosExpanded()"
+                (opened)="turnos.serviciosExpanded.set(true)"
+                (closed)="turnos.serviciosExpanded.set(false)"
+                class="turnos-expand-modal__filter-panel"
+              >
+                <mat-expansion-panel-header>
+                  <mat-panel-title>
+                    <mat-icon>medical_services</mat-icon>
+                    Servicios
+                  </mat-panel-title>
+                </mat-expansion-panel-header>
+                <div class="turnos-expand-modal__filter-options">
+                  <mat-checkbox
+                    [checked]="turnos.isTodosServiciosSelected()"
+                    (change)="turnos.onServiciosTodosToggle($event.checked)"
+                    [indeterminate]="turnos.isServiciosIndeterminado()"
+                    class="turnos-expand-modal__filter-option turnos-expand-modal__filter-option--all"
+                  >
+                    Todos
+                  </mat-checkbox>
+                  @for (servicio of turnos.servicios(); track servicio.id) {
+                    <mat-checkbox
+                      [checked]="turnos.isServicioSelected(servicio.id)"
+                      (change)="turnos.onServicioToggle(servicio.id, $event.checked)"
+                      class="turnos-expand-modal__filter-option"
+                    >
+                      <div class="turnos-expand-modal__filter-option-content">
+                        <span
+                          class="turnos-expand-modal__color-dot"
+                          [style.background-color]="servicio.color || '#1976d2'"
+                        ></span>
+                        <span>{{ servicio.nombre }}</span>
+                      </div>
+                    </mat-checkbox>
+                  }
+                </div>
+              </mat-expansion-panel>
+
+              <mat-expansion-panel
+                [expanded]="turnos.profesionalesExpanded()"
+                (opened)="turnos.profesionalesExpanded.set(true)"
+                (closed)="turnos.profesionalesExpanded.set(false)"
+                class="turnos-expand-modal__filter-panel"
+              >
+                <mat-expansion-panel-header>
+                  <mat-panel-title>
+                    <mat-icon>person</mat-icon>
+                    Profesionales
+                  </mat-panel-title>
+                </mat-expansion-panel-header>
+                <div class="turnos-expand-modal__filter-options">
+                  <mat-checkbox
+                    [checked]="turnos.isTodosProfesionalesSelected()"
+                    (change)="turnos.onProfesionalesTodosToggle($event.checked)"
+                    [indeterminate]="turnos.isProfesionalesIndeterminado()"
+                    class="turnos-expand-modal__filter-option turnos-expand-modal__filter-option--all"
+                  >
+                    Todos
+                  </mat-checkbox>
+                  @for (profesional of turnos.profesionales(); track profesional.id) {
+                    <mat-checkbox
+                      [checked]="turnos.isProfesionalSelected(profesional.id)"
+                      (change)="turnos.onProfesionalToggle(profesional.id, $event.checked)"
+                      class="turnos-expand-modal__filter-option"
+                    >
+                      {{ profesional.nombre }}
+                    </mat-checkbox>
+                  }
+                </div>
+              </mat-expansion-panel>
+            </div>
+          </div>
+        }
+      </div>
+    }
+  </main>
+</div>

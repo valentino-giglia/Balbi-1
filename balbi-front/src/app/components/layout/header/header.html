@@ -1,0 +1,18 @@
+<mat-toolbar color="primary" class="header">
+  <div class="row align-items-center w-100">
+    <div class="col-auto">
+      <button mat-icon-button (click)="onToggleSidebar()" class="me-2">
+        <mat-icon>menu</mat-icon>
+      </button>
+    </div>
+    <div class="col">
+      <span class="title">{{ title() }}</span>
+    </div>
+    <div class="col-auto">
+      <button mat-icon-button (click)="onLogout()" matTooltip="Cerrar sesión">
+        <mat-icon>logout</mat-icon>
+      </button>
+    </div>
+  </div>
+</mat-toolbar>
+

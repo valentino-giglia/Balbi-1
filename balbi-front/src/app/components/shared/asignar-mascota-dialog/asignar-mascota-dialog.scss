@@ -1,0 +1,27 @@
+.asignar-mascota-content {
+  min-width: 320px;
+  max-width: 420px;
+
+  .hint {
+    margin: 0 0 1rem;
+    font-size: 0.9rem;
+    line-height: 1.4;
+    color: rgba(0, 0, 0, 0.7);
+  }
+
+  .empty-hint {
+    margin: 0.5rem 0;
+    font-size: 0.875rem;
+    color: #666;
+  }
+
+  .error-msg {
+    color: var(--mat-warn-default, #c62828);
+    margin: 0 0 0.75rem;
+    font-size: 0.875rem;
+  }
+
+  .w-100 {
+    width: 100%;
+  }
+}

@@ -1,0 +1,118 @@
+.turnos-pendientes-page {
+  padding: 24px;
+
+  .page-header {
+    margin-bottom: 32px;
+
+    h1 {
+      margin: 0 0 8px 0;
+      font-size: 32px;
+      font-weight: 500;
+    }
+
+    .subtitle {
+      margin: 0;
+      color: rgba(0, 0, 0, 0.6);
+      font-size: 14px;
+    }
+  }
+
+  .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 48px 24px;
+    text-align: center;
+
+    mat-icon {
+      font-size: 64px;
+      width: 64px;
+      height: 64px;
+      color: rgba(0, 0, 0, 0.38);
+      margin-bottom: 16px;
+    }
+
+    h2 {
+      margin: 0 0 8px 0;
+      font-size: 20px;
+      font-weight: 500;
+    }
+
+    p {
+      margin: 0;
+      color: rgba(0, 0, 0, 0.6);
+    }
+  }
+
+  .table-container {
+    background: white;
+    border-radius: 4px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+
+    .turnos-table {
+      width: 100%;
+      table-layout: fixed;
+
+      th, td {
+        padding: 12px 16px;
+        text-align: left;
+        vertical-align: middle;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+      }
+
+      th {
+        font-weight: 500;
+        color: rgba(0, 0, 0, 0.87);
+        background-color: rgba(0, 0, 0, 0.02);
+      }
+
+      td {
+        color: rgba(0, 0, 0, 0.87);
+      }
+
+      tr.mat-row, tr.mat-header-row {
+        height: auto;
+        min-height: 48px;
+      }
+
+      .actions-cell {
+        display: flex;
+        gap: 0;
+        justify-content: flex-start;
+        align-items: center;
+        min-height: 48px;
+        width: 100%;
+        box-sizing: border-box;
+
+        button {
+          margin: 0;
+          width: 40px;
+          height: 40px;
+          flex-shrink: 0;
+
+          mat-icon {
+            font-size: 20px;
+            width: 20px;
+            height: 20px;
+          }
+        }
+      }
+    }
+
+    mat-paginator {
+      border-top: 1px solid rgba(0, 0, 0, 0.12);
+    }
+  }
+}
+
+@media (max-width: 768px) {
+  .turnos-pendientes-page {
+    padding: 16px;
+
+    .table-container {
+      overflow-x: auto;
+    }
+  }
+}

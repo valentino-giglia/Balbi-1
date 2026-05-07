@@ -1,0 +1,100 @@
+<div class="agenda-cal">
+  <div class="agenda-cal__top">
+    <div class="agenda-cal__corner">
+      <div class="agenda-cal__month">{{ monthLabel() }}</div>
+      <div class="agenda-cal__hint">Semana</div>
+    </div>
+
+    <div class="agenda-cal__days" role="row">
+      @for (day of days(); track dayKey(day)) {
+        <div class="agenda-cal__day" role="columnheader" [class.is-today]="isToday(day)">
+          <div class="agenda-cal__dow">{{ dayHeaderDow(day) }}</div>
+          <div class="agenda-cal__dom">{{ dayHeaderDom(day) }}</div>
+        </div>
+      }
+    </div>
+  </div>
+
+  <div
+    class="agenda-cal__scroll"
+    [style.--hour-height.px]="hourHeight()"
+    [style.--grid-height.px]="gridHeightPx()"
+  >
+    <div class="agenda-cal__time" role="rowgroup">
+      @for (slot of timeSlots(); track slot.hour + '-' + slot.minute) {
+        <div class="agenda-cal__time-row" role="row" [class.is-half-hour]="slot.minute === 30">
+          @if (slot.minute === 0) {
+            <span class="agenda-cal__time-label">{{ slot.label }}</span>
+          }
+        </div>
+      }
+    </div>
+
+    <div class="agenda-cal__grid" role="rowgroup">
+      @for (day of days(); track dayKey(day)) {
+        <div class="agenda-cal__day-col" role="gridcell" [class.is-today]="isToday(day)">
+          <div class="agenda-cal__hour-lines" aria-hidden="true">
+            @for (h of hours(); track h) {
+              <div class="agenda-cal__hour-line" [style.top.px]="(h - startHour()) * hourHeight()"></div>
+            }
+          </div>
+
+          <div class="agenda-cal__slot-lines" aria-hidden="true">
+            @for (slot of timeSlots(); track slot.hour + '-' + slot.minute) {
+              <div 
+                class="agenda-cal__slot-line" 
+                [style.top.px]="slotTopPx(slot.hour, slot.minute)"
+                [class.is-half-hour]="slot.minute === 30"
+              ></div>
+            }
+          </div>
+
+          @for (slot of timeSlots(); track slot.hour + '-' + slot.minute) {
+            <div
+              class="agenda-cal__slot-cell"
+              [class.agenda-cal__slot-cell--available]="isSlotAvailable(day, slot.hour, slot.minute)"
+              [style.top.px]="slotTopPx(slot.hour, slot.minute)"
+              [style.height.px]="slotHeight()"
+              (click)="onCellClick(day, slot.hour, slot.minute, $event)"
+              role="button"
+              tabindex="0"
+              [matTooltip]="availabilitySlotTooltip(day, slot.hour, slot.minute) ?? ('Click para crear turno a las ' + slot.label)"
+              matTooltipClass="agenda-cal-tooltip"
+              [title]="'Click para crear turno a las ' + slot.label"
+            ></div>
+          }
+
+          @for (ev of (eventsByDay().get(dayKey(day)) ?? []); track ev.id) {
+            <div
+              class="agenda-cal__event"
+              [ngClass]="statusClass(ev.status)"
+              [style.top.px]="ev._topPx"
+              [style.height.px]="ev._heightPx"
+              [style.background]="ev._bg ?? null"
+              [style.borderColor]="ev._border ?? null"
+              [style.color]="ev._text ?? null"
+              [style.borderLeftColor]="ev._accent ?? null"
+              [matTooltip]="ev._tooltip || ev._timeLabel"
+              matTooltipClass="agenda-cal-tooltip"
+              role="button"
+              tabindex="0"
+              (click)="onEventClick(ev, $event)"
+              (keydown)="onEventKeydown(ev, $event)"
+            >
+              <div class="agenda-cal__event-title">{{ ev.title }}</div>
+              <div class="agenda-cal__event-time">{{ ev._timeLabel }}</div>
+            </div>
+          }
+        </div>
+      }
+
+      @if (nowTopPx() !== null) {
+        <div class="agenda-cal__now" [style.top.px]="nowTopPx()!">
+          <div class="agenda-cal__now-dot" aria-hidden="true"></div>
+        </div>
+      }
+    </div>
+  </div>
+</div>
+
+

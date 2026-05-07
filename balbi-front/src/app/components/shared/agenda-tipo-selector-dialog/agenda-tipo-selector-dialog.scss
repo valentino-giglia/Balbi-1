@@ -1,0 +1,18 @@
+.agenda-tipo-selector__subtitle {
+  margin-bottom: 1rem;
+  color: rgba(0, 0, 0, 0.7);
+}
+
+.agenda-tipo-selector__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.agenda-tipo-selector__btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  justify-content: flex-start;
+  width: 100%;
+}

@@ -1,0 +1,491 @@
+<div class="pacientes-detalle-turnos-page">
+  @if (loading()) {
+    <app-loading-spinner></app-loading-spinner>
+  } @else if (paciente()) {
+    <!-- Header: tutor, última consulta, ficha, próximo turno -->
+    <div class="patient-header-section">
+      <div class="patient-profile">
+        <div class="patient-avatar">
+          <mat-icon>person</mat-icon>
+        </div>
+        <div class="patient-info">
+          <h1 class="patient-name">{{ paciente()!.nombre }}</h1>
+          <div class="patient-basic-info">
+            <span>DNI del dueño: {{ paciente()!.dni || '-' }}</span>
+            <span class="summary-item-inline">
+              <span class="summary-label">Última visita:</span>
+              <span class="summary-value">{{ obtenerUltimaConsulta() }}</span>
+            </span>
+          </div>
+        </div>
+      </div>
+
+      @if (mascotaSeleccionadaId() != null) {
+        <div class="patient-ficha">
+          <div class="patient-ficha-header">
+            <span class="ficha-title">Ficha de la mascota</span>
+            @if (!estaEditandoFicha()) {
+              <button mat-raised-button color="primary" (click)="entrarEdicionFicha()" [disabled]="savingFicha()">
+                <mat-icon>edit</mat-icon>
+                Editar ficha
+              </button>
+            } @else {
+              <div class="consulta-actions">
+                <button mat-raised-button color="primary" (click)="guardarFichaYSalir()" [disabled]="savingFicha()">
+                  @if (savingFicha()) {
+                    <app-loading-spinner [diameter]="20"></app-loading-spinner>
+                  } @else {
+                    <ng-container>
+                      <mat-icon>save</mat-icon>
+                      Guardar
+                    </ng-container>
+                  }
+                </button>
+                <button mat-button (click)="salirEdicionFicha()" [disabled]="savingFicha()">Cancelar</button>
+              </div>
+            }
+          </div>
+          @if (loadingFicha()) {
+            <app-loading-spinner></app-loading-spinner>
+          } @else if (estaEditandoFicha()) {
+            <div class="ficha-fields-material">
+              @for (campo of getFichaCampos(); track campo.key) {
+                <mat-form-field appearance="outline" class="w-100 ficha-field-material">
+                  <mat-label>{{ campo.label }}</mat-label>
+                  <input
+                    matInput
+                    [value]="getFichaCampoValor(campo.key)"
+                    (input)="actualizarFichaExtraEditando(campo.key, $any($event.target).value)"
+                    [placeholder]="'ej. ' + campo.label"
+                  />
+                </mat-form-field>
+              }
+            </div>
+          } @else {
+            <div class="ficha-summary">
+              @for (campo of getFichaCampos(); track campo.key) {
+                @if (getFichaCampoValor(campo.key)) {
+                  <span class="ficha-summary-item">{{ campo.label }}: {{ getFichaCampoValor(campo.key) }}</span>
+                }
+              }
+              @if (!tieneValoresFicha()) {
+                <span class="ficha-empty">Sin datos. Clic en Editar ficha para completar.</span>
+              }
+            </div>
+          }
+        </div>
+      }
+
+      <div class="patient-actions">
+        @if (obtenerProximoTurno()) {
+          <div class="proximo-turno">
+            <span class="proximo-label">Próximo turno:</span>
+            <span class="proximo-value">
+              {{ formatearFechaCorta(obtenerProximoTurno()!.horaInicio) }} -
+              {{ obtenerProximoTurno()!.horaInicio.split('T')[1]?.substring(0, 5) }} hs
+            </span>
+          </div>
+        }
+      </div>
+    </div>
+
+    <!-- Selector de mascota + botones en header -->
+    @if (mascotas().length > 0) {
+      <div class="mascota-selector-section">
+        <mat-form-field appearance="outline" class="mascota-select">
+          <mat-label>Ver datos de</mat-label>
+          <mat-select [value]="mascotaSeleccionadaId()" (selectionChange)="mascotaSeleccionadaId.set($event.value); onMascotaSeleccionadaChange()">
+            @for (m of mascotas(); track m.id) {
+              <mat-option [value]="m.id">
+                {{ m.nombre }}{{ m.especie ? ' (' + m.especie + ')' : '' }}
+                @if (esMascotaCompartida(m)) {
+                  <span class="mascota-opt-compartida"> · Compartida</span>
+                }
+              </mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+        <div class="header-mascota-actions">
+          <button mat-raised-button color="primary" (click)="abrirModalVacunas()" [disabled]="mascotaSeleccionadaId() == null">
+            <mat-icon>vaccines</mat-icon>
+            Vacunas
+          </button>
+          <button mat-raised-button color="primary" (click)="editarMascotaSeleccionada()" [disabled]="mascotaSeleccionadaId() == null">
+            <mat-icon>edit</mat-icon>
+            Editar
+          </button>
+          <button mat-raised-button color="primary" (click)="abrirMascotaForm()">
+            <mat-icon>add</mat-icon>
+            Crear mascota
+          </button>
+          <button
+            mat-raised-button
+            color="primary"
+            (click)="abrirCrearTurno()"
+            [disabled]="paciente() == null"
+            matTooltip="Agendar un turno para este tutor y la mascota seleccionada"
+          >
+            <mat-icon>event_available</mat-icon>
+            Sacar turno
+          </button>
+        </div>
+      </div>
+    } @else {
+      <div class="mascota-selector-section">
+        <p class="empty-mascotas-inline">Este tutor no tiene mascotas.</p>
+        <button mat-raised-button color="primary" (click)="abrirMascotaForm()">
+          <mat-icon>add</mat-icon>
+          Crear mascota
+        </button>
+      </div>
+    }
+
+    <!-- Contenedor Principal -->
+    <div class="main-container">
+      <!-- Área Central - Detalles de Consulta -->
+      <div class="center-content">
+        @if (mascotaSeleccionadaId() == null) {
+          <div class="empty-mascota-message">
+            <mat-icon>pets</mat-icon>
+            <p>Seleccioná una mascota para ver turnos y la ficha.</p>
+          </div>
+        } @else if (turnoActual() || turnosAntiguos().length > 0 || turnosProximos().length > 0) {
+          @if (turnoActual()) {
+            <mat-card class="consulta-card">
+              <div class="consulta-header">
+                <div class="consulta-info">
+                  <span class="consulta-duracion">Dur.: {{ turnoActual()!.duracionMinutos }}'</span>
+                  <span class="consulta-fecha">
+                    {{ formatearFechaCorta(turnoActual()!.horaInicio) }}
+                    @if (esTurnoProximo(turnoActual()!)) {
+                      - Programado
+                    } @else {
+                      hace {{ calcularDiasDesde(turnoActual()!.horaInicio) }} días
+                    }
+                  </span>
+                </div>
+                @if (esTurnoProximo(turnoActual()!)) {
+                  <span class="consulta-badge proximo">Próximo</span>
+                }
+              </div>
+
+              <div class="consulta-body">
+                <h3 class="consulta-seccion-titulo">Datos clínicos estructurados</h3>
+                <div class="consulta-campos-clinicos">
+                  <mat-form-field appearance="outline" class="w-100 consulta-field-material">
+                    <mat-label>Motivo de consulta</mat-label>
+                    <textarea
+                      matInput
+                      rows="3"
+                      [value]="getConsultaClinicaParaEdicion('motivoConsulta')"
+                      (input)="actualizarConsultaClinica('motivoConsulta', $any($event.target).value)"
+                      placeholder="Motivo de consulta / anamnesis"></textarea>
+                  </mat-form-field>
+                  <div class="consulta-examen-peso">
+                    <mat-form-field appearance="outline" class="w-100 consulta-field-material consulta-examen-field">
+                      <mat-label>Examen clínico</mat-label>
+                      <textarea
+                        matInput
+                        rows="3"
+                        [value]="getConsultaClinicaParaEdicion('examenClinico')"
+                        (input)="actualizarConsultaClinica('examenClinico', $any($event.target).value)"
+                        placeholder="Hallazgos del examen físico"></textarea>
+                    </mat-form-field>
+                    <mat-form-field appearance="outline" class="consulta-field-material consulta-peso-field">
+                      <mat-label>Peso (kg)</mat-label>
+                      <input
+                        matInput
+                        type="text"
+                        [value]="getPesoKgParaEdicion()"
+                        (input)="actualizarConsultaClinica('pesoKg', $any($event.target).value)"
+                        placeholder="ej. 12,5" />
+                    </mat-form-field>
+                  </div>
+                  <mat-form-field appearance="outline" class="w-100 consulta-field-material">
+                    <mat-label>Diagnóstico</mat-label>
+                    <textarea
+                      matInput
+                      rows="2"
+                      [value]="getConsultaClinicaParaEdicion('diagnostico')"
+                      (input)="actualizarConsultaClinica('diagnostico', $any($event.target).value)"
+                      placeholder="Diagnóstico presuntivo o definitivo"></textarea>
+                  </mat-form-field>
+                  <mat-form-field appearance="outline" class="w-100 consulta-field-material">
+                    <mat-label>Plan / tratamiento</mat-label>
+                    <textarea
+                      matInput
+                      rows="3"
+                      [value]="getConsultaClinicaParaEdicion('planTratamiento')"
+                      (input)="actualizarConsultaClinica('planTratamiento', $any($event.target).value)"
+                      placeholder="Indicaciones, medicación, controles"></textarea>
+                  </mat-form-field>
+                </div>
+
+                <h3>Tratamiento / Notas de la consulta</h3>
+                <div class="consulta-notas">
+                  <textarea class="consulta-notas-input"
+                            [value]="getNotaParaEdicion()"
+                            (input)="actualizarConsultaNotaEditando($any($event.target).value)"
+                            placeholder="Notas libres, indicaciones adicionales..."
+                            rows="6"></textarea>
+                </div>
+
+                <div class="consulta-metrics consulta-metrics-material">
+                  @for (campo of getConsultaCampos(turnoActual()!); track campo.key) {
+                    <mat-form-field appearance="outline" class="w-100 consulta-field-material">
+                      <mat-label>{{ campo.label }}</mat-label>
+                      <input
+                        matInput
+                        [value]="getConsultaCampoValor(turnoActual(), campo.key)"
+                        (input)="actualizarConsultaExtraEditando(campo.key, $any($event.target).value)"
+                        [placeholder]="'ej. ' + campo.label"
+                      />
+                    </mat-form-field>
+                  }
+                  @if (getConsultaCampos(turnoActual()!).length === 0) {
+                    <p class="text-muted small">No hay campos extra configurados para este servicio.</p>
+                  }
+                </div>
+
+                @if (puedeConfirmar(turnoActual()!.estado)) {
+                  <div class="consulta-confirmar">
+                    <button mat-raised-button color="primary" (click)="guardarNotasYSalir(turnoActual()!.id)" [disabled]="savingConsulta()">
+                      @if (savingConsulta()) {
+                        <app-loading-spinner [diameter]="20"></app-loading-spinner>
+                      } @else {
+                        Guardar
+                      }
+                    </button>
+                    <button mat-raised-button color="primary" (click)="confirmarTurno(turnoActual()!.id)" [disabled]="savingTurnoConfirmar()">
+                      @if (savingTurnoConfirmar()) {
+                        <app-loading-spinner [diameter]="20"></app-loading-spinner>
+                      } @else {
+                        <ng-container>
+                          <mat-icon>check_circle</mat-icon>
+                          Confirmar turno
+                        </ng-container>
+                      }
+                    </button>
+                  </div>
+                } @else {
+                  <div class="consulta-confirmar">
+                    <button mat-raised-button color="primary" (click)="guardarNotasYSalir(turnoActual()!.id)" [disabled]="savingConsulta()">
+                      @if (savingConsulta()) {
+                        <app-loading-spinner [diameter]="20"></app-loading-spinner>
+                      } @else {
+                        Guardar
+                      }
+                    </button>
+                  </div>
+                }
+
+                @if (turnoActual()!.tipo === 'INTERNACION') {
+                  <div class="consulta-internacion">
+                    <h3>Notas de internación</h3>
+                    <div class="internacion-list">
+                      @for (item of getInternacionNotas(); track $index; let i = $index) {
+                        <div class="internacion-item">
+                          <input type="date" class="internacion-fecha" [value]="item.fecha || ''"
+                                 (input)="updateInternacionNota(i, 'fecha', $any($event.target).value)" />
+                          <input type="text" class="internacion-nota" [value]="item.nota || ''" placeholder="Nota"
+                                 (input)="updateInternacionNota(i, 'nota', $any($event.target).value)" />
+                          <button mat-icon-button type="button" (click)="removeInternacionNota(i)" matTooltip="Quitar">
+                            <mat-icon>close</mat-icon>
+                          </button>
+                        </div>
+                      }
+                      <button mat-stroked-button type="button" (click)="addInternacionNota()">
+                        <mat-icon>add</mat-icon>
+                        Agregar nota de internación
+                      </button>
+                    </div>
+                  </div>
+                }
+
+                <div class="consulta-archivos">
+                  <h3>Archivos de esta consulta</h3>
+                  <button mat-stroked-button type="button" (click)="abrirDialogoArchivosConsulta()">
+                    <mat-icon>add_photo_alternate</mat-icon>
+                    Cargar archivos de esta consulta
+                  </button>
+                  @if (loadingArchivosTurno()) {
+                    <app-loading-spinner [diameter]="24"></app-loading-spinner>
+                  } @else if (archivosTurnoActual().length > 0) {
+                    <ul class="archivos-turno-list">
+                      @for (f of archivosTurnoActual(); track f.id) {
+                        <li class="archivo-turno-item">
+                          @if (f.tipoArchivo === 'DOCUMENTO') {
+                            <mat-icon class="archivo-icon doc">picture_as_pdf</mat-icon>
+                            <a [href]="f.url ?? '#'" target="_blank" rel="noopener" class="archivo-link">{{ f.nombreArchivo || 'Documento' }}</a>
+                          } @else {
+                            <mat-icon class="archivo-icon img">image</mat-icon>
+                            <a [href]="f.url ?? '#'" target="_blank" rel="noopener" class="archivo-link">{{ f.nombreArchivo || 'Imagen' }}</a>
+                          }
+                          <button mat-icon-button type="button" (click)="eliminarArchivoTurno(f.id)" matTooltip="Eliminar">
+                            <mat-icon>delete</mat-icon>
+                          </button>
+                        </li>
+                      }
+                    </ul>
+                  } @else {
+                    <p class="text-muted small">Sin archivos. Clic en el botón para cargar imágenes o PDF de esta consulta.</p>
+                  }
+                </div>
+              </div>
+            </mat-card>
+          } @else {
+            <mat-card class="consulta-card">
+              <div class="empty-consulta empty-consulta--elegir-turno" role="status" aria-live="polite">
+                <mat-icon aria-hidden="true">event_note</mat-icon>
+                <p>Seleccioná un turno en el historial de la derecha para ver los detalles.</p>
+              </div>
+            </mat-card>
+          }
+        } @else {
+          <mat-card class="consulta-card">
+            <div class="empty-consulta">
+              <mat-icon>event_busy</mat-icon>
+              <p>No hay turnos para esta mascota.</p>
+            </div>
+          </mat-card>
+        }
+      </div>
+
+      <!-- Sidebar Derecho: historial de turnos destacado, imprimir, vacunas/archivos -->
+      <div class="right-sidebar">
+        <div class="historial-turnos-panel">
+          <div class="historial-turnos-panel-head">
+            <div class="historial-turnos-panel-icon" aria-hidden="true">
+              <mat-icon>event_note</mat-icon>
+            </div>
+            <div class="historial-turnos-panel-titles">
+              <h3 class="historial-turnos-panel-title">Historial de turnos</h3>
+              <p class="historial-turnos-panel-sub">Elegí una visita para ver y editar la consulta</p>
+              <ul class="historial-estados-leyenda" aria-label="Estados de los turnos">
+                <li title="Turno confirmado">
+                  <span class="historial-estados-leyenda__dot historial-estados-leyenda__dot--reservado"></span>
+                  Reservado
+                </li>
+                <li title="Aún no confirmado">
+                  <span class="historial-estados-leyenda__dot historial-estados-leyenda__dot--pendiente"></span>
+                  Pendiente
+                </li>
+                <li title="Atención realizada">
+                  <span class="historial-estados-leyenda__dot historial-estados-leyenda__dot--completado"></span>
+                  Completado
+                </li>
+                <li title="Turno cancelado">
+                  <span class="historial-estados-leyenda__dot historial-estados-leyenda__dot--cancelado"></span>
+                  Cancelado
+                </li>
+                <li title="Registro dado de baja">
+                  <span class="historial-estados-leyenda__dot historial-estados-leyenda__dot--baja"></span>
+                  Baja
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="historial-timeline historial-timeline--in-panel">
+            @if (mascotaSeleccionadaId() == null) {
+              <div class="empty-historial">
+                <p>Seleccioná una mascota para ver el historial de turnos.</p>
+              </div>
+            } @else if (historialTurnosParaSidebar().length === 0) {
+              <div class="empty-historial">
+                <p>No hay turnos registrados para esta mascota.</p>
+              </div>
+            } @else {
+              <div class="timeline">
+                @for (item of historialTurnosParaSidebar(); track item.turno.id) {
+                  <button
+                    type="button"
+                    class="timeline-item-btn"
+                    [class.active]="turnoActual()?.id === item.turno.id"
+                    [class.timeline-item--proximo]="item.esProximo"
+                    (click)="seleccionarTurno(item.turno)"
+                  >
+                    <div class="timeline-marker" [ngClass]="claseMarcadorEstado(item.estado)"></div>
+                    <div class="timeline-content">
+                      <div class="timeline-fila-superior">
+                        <span class="timeline-date">
+                          {{ formatearFechaCorta(item.fecha + 'T' + item.hora) }}, {{ item.hora }} hs.
+                        </span>
+                        @if (item.esHoy) {
+                          <span class="timeline-hoy-badge">Hoy</span>
+                        }
+                        <span class="timeline-estado" [attr.title]="item.estadoLabel">{{ item.estadoLabel }}</span>
+                      </div>
+                      <span class="timeline-servicio">{{ item.servicioNombre }}</span>
+                      <span class="timeline-profesional">
+                        <mat-icon class="timeline-inline-icon" aria-hidden="true">person</mat-icon>
+                        {{ item.profesional }}
+                      </span>
+                      @if (item.mascotaLinea) {
+                        <span class="timeline-mascota">
+                          <mat-icon class="timeline-inline-icon" aria-hidden="true">pets</mat-icon>
+                          {{ item.mascotaLinea }}
+                        </span>
+                      }
+                      @if (item.motivoLinea) {
+                        <span class="timeline-motivo">{{ item.motivoLinea }}</span>
+                      }
+                    </div>
+                  </button>
+                }
+              </div>
+            }
+          </div>
+        </div>
+
+        <div class="historial-header">
+          <button mat-raised-button color="primary" (click)="imprimirHistorialClinico()" [disabled]="loadingPdfHistorial()">
+            @if (loadingPdfHistorial()) {
+              <app-loading-spinner [diameter]="20"></app-loading-spinner>
+            } @else {
+              <ng-container>
+                <mat-icon class="btn-lead-icon">picture_as_pdf</mat-icon>
+                Imprimir historial clínico
+              </ng-container>
+            }
+          </button>
+        </div>
+
+        @if (mascotaSeleccionadaId() != null) {
+          <div class="historial-ampliado">
+            <h3 class="historial-ampliado-title">Vacunas</h3>
+            @if (loadingHistorialSidebar()) {
+              <app-loading-spinner [diameter]="24"></app-loading-spinner>
+            } @else if (historialSidebarVacunas().length === 0) {
+              <p class="historial-ampliado-empty">Sin vacunas registradas.</p>
+            } @else {
+              <ul class="historial-ampliado-list">
+                @for (v of historialSidebarVacunas(); track v.id) {
+                  <li>
+                    <span class="historial-ampliado-name">{{ v.nombre }}</span>
+                    <span class="historial-ampliado-meta">{{ formatearFechaCorta(v.fechaAplicacion) }}</span>
+                  </li>
+                }
+              </ul>
+            }
+            <h3 class="historial-ampliado-title">Archivos</h3>
+            @if (loadingHistorialSidebar()) {
+              <app-loading-spinner [diameter]="24"></app-loading-spinner>
+            } @else if (historialSidebarFiles().length === 0) {
+              <p class="historial-ampliado-empty">Sin archivos adjuntos.</p>
+            } @else {
+              <ul class="historial-ampliado-list historial-ampliado-files">
+                @for (f of historialSidebarFiles(); track f.id) {
+                  <li>
+                    <span class="historial-ampliado-name">{{ f.nombreArchivo || 'Archivo' }}</span>
+                    <span class="historial-ampliado-meta">{{ f.tipoArchivo || '' }}</span>
+                  </li>
+                }
+              </ul>
+            }
+          </div>
+        }
+      </div>
+    </div>
+  }
+</div>

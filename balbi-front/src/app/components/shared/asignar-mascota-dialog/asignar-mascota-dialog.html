@@ -1,0 +1,65 @@
+<h2 mat-dialog-title>Asignar mascota</h2>
+<mat-dialog-content class="asignar-mascota-content">
+  <p class="hint">
+    Se vincula una mascota de <strong>otro tutor</strong> para que <strong>{{ data.coTutorNombre }}</strong> sea
+    co-tutor (misma ficha, turnos e historial).
+  </p>
+  @if (error) {
+    <p class="error-msg">{{ error }}</p>
+  }
+
+  <mat-form-field appearance="outline" class="w-100">
+    <mat-label>Tutor titular de la mascota</mat-label>
+    <input
+      matInput
+      [formControl]="titularSearchControl"
+      [matAutocomplete]="autoTit"
+      placeholder="Buscar por nombre"
+    />
+    <mat-autocomplete
+      #autoTit="matAutocomplete"
+      [displayWith]="displayTutor"
+      (optionSelected)="onTitularSelected($event)"
+    >
+      @for (p of titularFiltrados; track p.id) {
+        <mat-option [value]="p">{{ p.nombre }} @if (p.dni) { — {{ p.dni }} }</mat-option>
+      }
+    </mat-autocomplete>
+  </mat-form-field>
+
+  @if (titularSeleccionado) {
+    @if (loadingMascotas) {
+      <mat-spinner diameter="36" />
+    } @else if (mascotasTitular.length === 0) {
+      <p class="empty-hint">Este tutor no tiene mascotas activas.</p>
+    } @else {
+      <mat-form-field appearance="outline" class="w-100">
+        <mat-label>Mascota</mat-label>
+        <mat-select [formControl]="mascotaIdCtrl">
+          @for (m of mascotasTitular; track m.id) {
+            <mat-option [value]="m.id">{{ m.nombre }} @if (m.especie) { ({{ m.especie }}) }</mat-option>
+          }
+        </mat-select>
+        @if (mascotaIdCtrl.invalid && mascotaIdCtrl.touched) {
+          <mat-error>Elegí una mascota</mat-error>
+        }
+      </mat-form-field>
+    }
+  }
+</mat-dialog-content>
+<mat-dialog-actions align="end">
+  <button mat-stroked-button type="button" (click)="cerrar()" [disabled]="loadingGuardar">Cancelar</button>
+  <button
+    mat-raised-button
+    color="primary"
+    type="button"
+    (click)="guardar()"
+    [disabled]="loadingGuardar || !titularSeleccionado || mascotasTitular.length === 0"
+  >
+    @if (loadingGuardar) {
+      Guardando...
+    } @else {
+      Confirmar
+    }
+  </button>
+</mat-dialog-actions>

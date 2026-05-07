@@ -1,0 +1,78 @@
+<h2 mat-dialog-title>Ficha de la Mascota</h2>
+
+<mat-dialog-content>
+  <form class="ficha-form">
+    <div class="form-row">
+      <mat-form-field appearance="outline">
+        <mat-label>Fecha de Nacimiento</mat-label>
+        <input matInput type="date" [(ngModel)]="ficha.fechaNacimiento" name="fechaNacimiento">
+        <mat-hint>De la mascota</mat-hint>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Sexo</mat-label>
+        <mat-select [(ngModel)]="ficha.sexo" name="sexo">
+          <mat-option value="Macho">Macho</mat-option>
+          <mat-option value="Hembra">Hembra</mat-option>
+          <mat-option value="Otro">Otro</mat-option>
+        </mat-select>
+      </mat-form-field>
+    </div>
+
+    <div class="form-row">
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Domicilio</mat-label>
+        <input matInput [(ngModel)]="ficha.domicilio" name="domicilio">
+        <mat-hint>Del dueño o tutor</mat-hint>
+      </mat-form-field>
+    </div>
+
+    <div class="form-row">
+      <mat-form-field appearance="outline">
+        <mat-label>Localidad</mat-label>
+        <input matInput [(ngModel)]="ficha.localidad" name="localidad">
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Castrado/a</mat-label>
+        <input matInput [(ngModel)]="ficha.estadoCivil" name="estadoCivil" placeholder="Sí / No">
+      </mat-form-field>
+    </div>
+
+    <div class="form-row">
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Especie / Raza</mat-label>
+        <input matInput [(ngModel)]="ficha.ocupacion" name="ocupacion" placeholder="ej. Perro, Golden Retriever">
+      </mat-form-field>
+    </div>
+
+    <div class="form-row">
+      <mat-form-field appearance="outline">
+        <mat-label>Plan de Salud</mat-label>
+        <input matInput [(ngModel)]="ficha.obraSocial" name="obraSocial" placeholder="Si aplica">
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Nro. Afiliado</mat-label>
+        <input matInput [(ngModel)]="ficha.nroAfiliado" name="nroAfiliado">
+      </mat-form-field>
+    </div>
+
+    <div class="form-row">
+      <mat-form-field appearance="outline">
+        <mat-label>Microchip</mat-label>
+        <input matInput [(ngModel)]="ficha.nacionalidad" name="nacionalidad" placeholder="Número de identificación">
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Notas adicionales</mat-label>
+        <input matInput [(ngModel)]="ficha.religion" name="religion">
+      </mat-form-field>
+    </div>
+  </form>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button (click)="onCancelar()">Cancelar</button>
+  <button mat-raised-button color="primary" (click)="onGuardar()">Guardar</button>
+</mat-dialog-actions>

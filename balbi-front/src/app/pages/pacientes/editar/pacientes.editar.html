@@ -1,0 +1,77 @@
+<div class="pacientes-editar-page">
+  <div class="row align-items-center mb-3">
+    <div class="col-auto">
+      <h1 class="m-0">Editar tutor</h1>
+    </div>
+  </div>
+
+  @if (loadingData()) {
+    <app-loading-spinner></app-loading-spinner>
+  } @else {
+    @if (error()) {
+      <div class="alert alert-danger mb-3">{{ error() }}</div>
+    }
+
+    <form [formGroup]="form" (ngSubmit)="onSubmit()">
+      <div class="row">
+        <div class="col-md-6 mb-3">
+          <mat-form-field appearance="outline" class="w-100">
+            <mat-label>Nombre *</mat-label>
+            <input matInput formControlName="nombre" required placeholder="Nombre del tutor">
+            @if (form.get('nombre')?.hasError('required') && form.get('nombre')?.touched) {
+              <mat-error>El nombre es requerido</mat-error>
+            }
+          </mat-form-field>
+        </div>
+
+        <div class="col-md-6 mb-3">
+          <mat-form-field appearance="outline" class="w-100">
+            <mat-label>DNI</mat-label>
+            <input matInput formControlName="dni" placeholder="Opcional">
+          </mat-form-field>
+        </div>
+
+        <div class="col-md-6 mb-3">
+          <mat-form-field appearance="outline" class="w-100">
+            <mat-label>Teléfono</mat-label>
+            <input matInput formControlName="telefono">
+          </mat-form-field>
+        </div>
+
+        <div class="col-md-6 mb-3">
+          <mat-form-field appearance="outline" class="w-100">
+            <mat-label>Email</mat-label>
+            <input matInput type="email" formControlName="email">
+            @if (form.get('email')?.hasError('email') && form.get('email')?.touched) {
+              <mat-error>Email inválido</mat-error>
+            }
+          </mat-form-field>
+        </div>
+
+        <div class="col-md-6 mb-3">
+          <mat-form-field appearance="outline" class="w-100">
+            <mat-label>Kapso Phone Number ID</mat-label>
+            <input matInput formControlName="kapso_phone_number_id">
+          </mat-form-field>
+        </div>
+
+      </div>
+
+      <div class="row">
+        <div class="col-12">
+          <button mat-raised-button type="button" (click)="cancelar()" class="me-2">
+            Cancelar
+          </button>
+          <button mat-raised-button color="primary" type="submit" [disabled]="loading()">
+            @if (loading()) {
+              <app-loading-spinner></app-loading-spinner>
+            } @else {
+              Guardar
+            }
+          </button>
+        </div>
+      </div>
+    </form>
+  }
+</div>
+

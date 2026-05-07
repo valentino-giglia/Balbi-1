@@ -1,0 +1,43 @@
+.turno-editar-modal {
+  padding: 24px !important;
+
+  &__title {
+    margin-bottom: 16px;
+  }
+
+  &__content {
+    min-width: 600px;
+    max-width: 800px;
+    padding-top: 24px !important;
+  }
+
+  &__horarios {
+    font-size: 12px;
+    color: rgba(0, 0, 0, 0.65);
+    margin-top: -8px;
+    margin-bottom: 8px;
+  }
+
+  &__horarios-linea {
+    margin-top: 2px;
+
+    &:first-of-type {
+      margin-top: 4px;
+    }
+  }
+
+  &__aviso-fuera-horario {
+    background-color: #fff8e1;
+    border-left: 4px solid #f9a825;
+
+    mat-icon {
+      color: #f57c00;
+      margin-right: 8px;
+      flex-shrink: 0;
+    }
+  }
+
+  .gap-2 {
+    gap: 8px;
+  }
+}

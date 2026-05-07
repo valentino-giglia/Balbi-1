@@ -1,0 +1,37 @@
+<div class="custom-fields-page">
+  <div class="row align-items-center justify-content-between mb-3">
+    <div class="col-auto">
+      <h1 class="m-0">Campos personalizados</h1>
+    </div>
+    <div class="col-auto">
+      <button mat-raised-button color="primary" (click)="crear()">
+        <mat-icon>add</mat-icon>
+        Nuevo campo
+      </button>
+    </div>
+  </div>
+
+  <p class="text-muted mb-3">
+    Definí campos extra para consultas y fichas. Luego completalos al editar cada registro.
+  </p>
+
+  @if (loading()) {
+    <app-loading-spinner></app-loading-spinner>
+  } @else {
+    <app-data-table
+      [columns]="columns"
+      [data]="customFields()"
+      [loading]="loading()"
+      [showSearch]="false"
+      [showViewAction]="false"
+      [serverSidePagination]="true"
+      [totalCount]="totalCount()"
+      [currentPageIndex]="currentPage()"
+      [pageSize]="pageSize()"
+      (onEdit)="onEdit($event)"
+      (onDelete)="onDelete($event)"
+      (onPageChange)="onPageChange($event)">
+    </app-data-table>
+  }
+</div>
+

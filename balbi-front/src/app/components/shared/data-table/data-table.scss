@@ -1,0 +1,52 @@
+.data-table-container {
+  background: white;
+  border-radius: 4px;
+  overflow: hidden;
+
+  .table-header {
+    padding: 16px;
+    border-bottom: 1px solid #e0e0e0;
+
+    .search-field {
+      width: 100%;
+      max-width: 400px;
+    }
+  }
+
+  .table-wrapper {
+    position: relative;
+    min-height: 200px;
+    max-height: 600px;
+    overflow: auto;
+
+    .data-table {
+      width: 100%;
+
+      th {
+        font-weight: 500;
+      }
+
+      .status-active {
+        background-color: #4caf50;
+        color: white;
+      }
+
+      .status-inactive {
+        background-color: #ff9800;
+        color: white;
+      }
+
+      .status-baja {
+        background-color: #f44336;
+        color: white;
+      }
+    }
+
+    .no-data {
+      padding: 48px;
+      text-align: center;
+      color: #757575;
+    }
+  }
+}
+

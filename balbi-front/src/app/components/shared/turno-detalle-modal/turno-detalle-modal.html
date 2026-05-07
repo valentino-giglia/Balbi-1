@@ -1,0 +1,150 @@
+<div class="turno-detalle-modal">
+  <div class="modal-header">
+    <h2 mat-dialog-title>Detalle de Consulta</h2>
+    <button mat-icon-button (click)="cerrar()" class="close-button">
+      <mat-icon>close</mat-icon>
+    </button>
+  </div>
+
+  <mat-dialog-content>
+    <div class="detalle-content">
+      <!-- Información del Turno -->
+      <mat-card class="info-card">
+        <mat-card-header>
+          <mat-card-title>
+            <mat-icon>event</mat-icon>
+            Información del Turno
+          </mat-card-title>
+        </mat-card-header>
+        <mat-card-content>
+          <div class="info-grid">
+            <div class="info-item">
+              <span class="label">Fecha y Hora:</span>
+              <span class="value">{{ formatearFecha(turno.horaInicio) }}</span>
+            </div>
+            <div class="info-item">
+              <span class="label">Duración:</span>
+              <span class="value">{{ turno.duracionMinutos }} minutos</span>
+            </div>
+            <div class="info-item">
+              <span class="label">Estado:</span>
+              <mat-chip [color]="getEstadoColor(turno.estado)">
+                {{ turno.estado }}
+              </mat-chip>
+            </div>
+            @if (turno.precio) {
+              <div class="info-item">
+                <span class="label">Precio:</span>
+                <span class="value">${{ turno.precio }}</span>
+              </div>
+            }
+          </div>
+        </mat-card-content>
+      </mat-card>
+
+      <!-- Servicio -->
+      @if (turno.servicio) {
+        <mat-card class="info-card">
+          <mat-card-header>
+            <mat-card-title>
+              <mat-icon>medical_services</mat-icon>
+              Servicio
+            </mat-card-title>
+          </mat-card-header>
+          <mat-card-content>
+            <div class="info-grid">
+              <div class="info-item">
+                <span class="label">Nombre:</span>
+                <span class="value">{{ turno.servicio.nombre }}</span>
+              </div>
+              @if (turno.servicio.codigo) {
+                <div class="info-item">
+                  <span class="label">Código:</span>
+                  <span class="value">{{ turno.servicio.codigo }}</span>
+                </div>
+              }
+            </div>
+          </mat-card-content>
+        </mat-card>
+      }
+
+      <!-- Profesional -->
+      @if (turno.profesional) {
+        <mat-card class="info-card">
+          <mat-card-header>
+            <mat-card-title>
+              <mat-icon>person</mat-icon>
+              Profesional
+            </mat-card-title>
+          </mat-card-header>
+          <mat-card-content>
+            <div class="info-grid">
+              <div class="info-item">
+                <span class="label">Nombre:</span>
+                <span class="value">{{ turno.profesional.nombre }}</span>
+              </div>
+              @if (turno.profesional.telefono) {
+                <div class="info-item">
+                  <span class="label">Teléfono:</span>
+                  <span class="value">{{ turno.profesional.telefono }}</span>
+                </div>
+              }
+              @if (turno.profesional.email) {
+                <div class="info-item">
+                  <span class="label">Email:</span>
+                  <span class="value">{{ turno.profesional.email }}</span>
+                </div>
+              }
+            </div>
+          </mat-card-content>
+        </mat-card>
+      }
+
+      <!-- Notas de Consulta -->
+      <mat-card class="info-card notas-consulta-card">
+        <mat-card-header>
+          <mat-card-title>
+            <mat-icon>description</mat-icon>
+            Notas de Consulta
+          </mat-card-title>
+        </mat-card-header>
+        <mat-card-content>
+          <mat-form-field appearance="outline" class="notas-form-field">
+            <mat-label>Notas de la consulta veterinaria...</mat-label>
+            <textarea
+              matInput
+              [ngModel]="notasConsulta()"
+              (ngModelChange)="notasConsulta.set($event)"
+              rows="8"
+              placeholder="Diagnóstico, tratamiento, indicaciones..."
+              class="notas-textarea"
+            ></textarea>
+          </mat-form-field>
+        </mat-card-content>
+      </mat-card>
+
+      <!-- Notas Generales -->
+      @if (turno.notas) {
+        <mat-card class="info-card">
+          <mat-card-header>
+            <mat-card-title>
+              <mat-icon>note</mat-icon>
+              Notas Generales
+            </mat-card-title>
+          </mat-card-header>
+          <mat-card-content>
+            <p class="notas-text">{{ turno.notas }}</p>
+          </mat-card-content>
+        </mat-card>
+      }
+    </div>
+  </mat-dialog-content>
+
+  <mat-dialog-actions align="end">
+    <button mat-button (click)="cerrar()">Cerrar</button>
+    <button mat-raised-button color="primary" (click)="guardarNotas()">
+      <mat-icon>save</mat-icon>
+      Guardar Notas
+    </button>
+  </mat-dialog-actions>
+</div>

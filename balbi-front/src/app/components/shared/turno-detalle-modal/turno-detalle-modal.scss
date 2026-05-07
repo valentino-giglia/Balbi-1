@@ -1,0 +1,121 @@
+.turno-detalle-modal {
+  .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 24px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+
+    h2 {
+      margin: 0;
+      font-size: 20px;
+      font-weight: 500;
+    }
+
+    .close-button {
+      margin: 0;
+    }
+  }
+
+  mat-dialog-content {
+    padding: 24px;
+    max-height: 70vh;
+    overflow-y: auto;
+  }
+
+  .detalle-content {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .info-card {
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+
+    mat-card-header {
+      margin-bottom: 16px;
+
+      mat-card-title {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 16px;
+        font-weight: 500;
+
+        mat-icon {
+          font-size: 20px;
+          width: 20px;
+          height: 20px;
+        }
+      }
+    }
+
+    .info-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+
+      .info-item {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+
+        .label {
+          font-size: 12px;
+          color: rgba(0, 0, 0, 0.54);
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          font-weight: 500;
+        }
+
+        .value {
+          font-size: 14px;
+          color: rgba(0, 0, 0, 0.87);
+          font-weight: 400;
+        }
+      }
+    }
+
+    .notas-text {
+      margin: 0;
+      font-size: 14px;
+      color: rgba(0, 0, 0, 0.87);
+      line-height: 1.5;
+      white-space: pre-wrap;
+    }
+  }
+
+  .notas-consulta-card {
+    border: 2px solid #1976d2;
+    background-color: #f5f9ff;
+
+    mat-card-header {
+      mat-card-title {
+        color: #1976d2;
+        font-weight: 600;
+      }
+    }
+
+    .notas-form-field {
+      width: 100%;
+      margin-top: 8px;
+
+      ::ng-deep .mat-mdc-form-field-subscript-wrapper {
+        margin-top: 4px;
+      }
+
+      .notas-textarea {
+        font-size: 14px;
+        line-height: 1.6;
+        resize: vertical;
+        min-height: 120px;
+        font-family: inherit;
+      }
+    }
+  }
+
+  mat-dialog-actions {
+    padding: 16px 24px;
+    border-top: 1px solid rgba(0, 0, 0, 0.12);
+  }
+}

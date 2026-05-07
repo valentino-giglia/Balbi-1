@@ -1,0 +1,57 @@
+.servicios-agregar-page {
+  padding: 16px;
+}
+
+.color-input-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+
+  .color-picker {
+    width: 48px;
+    height: 48px;
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    border-radius: 4px;
+    cursor: pointer;
+    flex-shrink: 0;
+    padding: 4px;
+    background: none;
+
+    &::-webkit-color-swatch-wrapper {
+      padding: 0;
+    }
+
+    &::-webkit-color-swatch {
+      border: none;
+      border-radius: 2px;
+    }
+
+    &::-moz-color-swatch {
+      border: none;
+      border-radius: 2px;
+    }
+  }
+
+  input[matInput] {
+    flex: 1;
+  }
+}
+
+.extra-fields-section {
+  margin-bottom: 24px;
+  padding: 16px;
+  background: var(--mat-sys-surface-container-low, #f5f5f5);
+  border-radius: 8px;
+
+  h3 {
+    font-size: 1rem;
+    font-weight: 600;
+  }
+}
+
+.extra-fields-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 8px 16px;
+}

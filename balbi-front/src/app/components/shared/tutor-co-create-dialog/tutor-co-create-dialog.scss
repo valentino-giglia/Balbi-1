@@ -1,0 +1,16 @@
+.tutor-co-create-dialog {
+  .hint {
+    margin: 0 0 1rem;
+    font-size: 0.875rem;
+    opacity: 0.85;
+  }
+
+  .w-100 {
+    width: 100%;
+  }
+
+  .error-msg {
+    color: var(--mat-warn-default);
+    margin: 0 0 0.75rem;
+  }
+}

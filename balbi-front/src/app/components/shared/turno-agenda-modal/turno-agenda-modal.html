@@ -1,0 +1,58 @@
+<div class="turno-agenda-modal">
+  <header class="turno-agenda-modal__header">
+    <div class="turno-agenda-modal__title-group">
+      <button mat-icon-button (click)="close()" aria-label="Cerrar agenda">
+        <mat-icon>close</mat-icon>
+      </button>
+      <div class="turno-agenda-modal__titles">
+        <h2>Agendar turno</h2>
+        <p class="subtitle">
+          El calendario muestra los turnos ya reservados; tocá un horario libre para crear uno nuevo o un turno existente para editarlo
+        </p>
+      </div>
+    </div>
+
+    <div class="turno-agenda-modal__actions">
+      <button mat-stroked-button type="button" (click)="today()">
+        <mat-icon>today</mat-icon>
+        Hoy
+      </button>
+      <button mat-icon-button type="button" (click)="prevWeek()" matTooltip="Semana anterior">
+        <mat-icon>chevron_left</mat-icon>
+      </button>
+      <span class="week-label">{{ calendarWeekLabel() }}</span>
+      <button mat-icon-button type="button" (click)="nextWeek()" matTooltip="Semana siguiente">
+        <mat-icon>chevron_right</mat-icon>
+      </button>
+    </div>
+  </header>
+
+  <main class="turno-agenda-modal__body">
+    @if (loading()) {
+      <div class="turno-agenda-modal__loading">
+        <app-loading-spinner></app-loading-spinner>
+      </div>
+    } @else {
+      @if (error()) {
+        <div class="turno-agenda-modal__error">
+          <mat-icon>error_outline</mat-icon>
+          <span>{{ error() }}</span>
+        </div>
+      }
+
+      <div class="turno-agenda-modal__calendar-wrapper">
+        <app-agenda-calendar
+          [viewDate]="calendarViewDate()"
+          [events]="calendarEvents()"
+          [weekStartsOn]="1"
+          [startHour]="7"
+          [endHour]="21"
+          [hourHeight]="80"
+          (eventClick)="onCalendarEventClick($event)"
+          (cellClick)="onCalendarCellClick($event.day, $event.hour, $event.minute)"
+        ></app-agenda-calendar>
+      </div>
+    }
+  </main>
+</div>
+

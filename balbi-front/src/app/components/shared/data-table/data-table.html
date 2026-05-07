@@ -1,0 +1,119 @@
+<div class="data-table-container">
+  @if (showSearch()) {
+    <div class="table-header">
+      <mat-form-field appearance="outline" class="search-field">
+        <mat-label>{{ searchPlaceholder() }}</mat-label>
+        <input 
+          matInput 
+          [value]="searchTerm()" 
+          (input)="onSearchChange($any($event.target).value)" 
+          placeholder="{{ searchPlaceholder() }}">
+        <mat-icon matPrefix>search</mat-icon>
+      </mat-form-field>
+    </div>
+  }
+
+  <div class="table-wrapper">
+    <table mat-table [dataSource]="filteredData()" class="data-table">
+      @for (column of columns(); track column.key) {
+        <ng-container [matColumnDef]="column.key">
+          <th mat-header-cell *matHeaderCellDef>{{ column.label }}</th>
+          <td mat-cell *matCellDef="let row">
+            @if (column.type === 'status') {
+              <mat-chip [class]="getStatusClass(row[column.key])">
+                {{ row[column.key] }}
+              </mat-chip>
+            } @else if (column.type === 'toggle') {
+              <mat-slide-toggle
+                [checked]="row[column.key] === 'ON' || row[column.key] === true"
+                (change)="onToggleChange(row, column, $event.checked)"
+                [disabled]="loading()">
+              </mat-slide-toggle>
+            } @else {
+              {{ formatValue(row[column.key], column.type) }}
+            }
+          </td>
+        </ng-container>
+      }
+
+      @if (showActions()) {
+        <ng-container matColumnDef="actions">
+          <th mat-header-cell *matHeaderCellDef>Acciones</th>
+          <td mat-cell *matCellDef="let row">
+            @if (showViewAction()) {
+              @if (viewActionAsMenu()) {
+                <button
+                  mat-icon-button
+                  type="button"
+                  [matMenuTriggerFor]="viewOptionsMenu"
+                  [matMenuTriggerData]="{ row: row }"
+                  matTooltip="Opciones"
+                >
+                  <mat-icon>visibility</mat-icon>
+                </button>
+              } @else {
+                <button mat-icon-button type="button" (click)="onView.emit(row)" matTooltip="Ver">
+                  <mat-icon>visibility</mat-icon>
+                </button>
+              }
+            }
+            @if (showEditAction()) {
+              <button mat-icon-button type="button" (click)="onEdit.emit(row)" matTooltip="Editar">
+                <mat-icon>edit</mat-icon>
+              </button>
+            }
+            @if (showDeleteAction()) {
+              <button mat-icon-button type="button" (click)="onDelete.emit(row)" matTooltip="Eliminar" color="warn">
+                <mat-icon>delete</mat-icon>
+              </button>
+            }
+          </td>
+        </ng-container>
+      }
+
+      <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+      <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
+    </table>
+
+    @if (loading()) {
+      <app-loading-spinner></app-loading-spinner>
+    }
+
+    @if (!loading() && filteredData().length === 0) {
+      <div class="no-data">
+        <p>No hay datos para mostrar</p>
+      </div>
+    }
+  </div>
+
+  <mat-menu #viewOptionsMenu="matMenu">
+    <ng-template matMenuContent let-row="row">
+      <button mat-menu-item type="button" (click)="onViewMenu.emit({ action: 'detalle', row })">
+        <mat-icon>badge</mat-icon>
+        <span>Ver ficha del tutor</span>
+      </button>
+      <button mat-menu-item type="button" (click)="onViewMenu.emit({ action: 'crearMascota', row })">
+        <mat-icon>add_circle</mat-icon>
+        <span>Crear mascota</span>
+      </button>
+      <button mat-menu-item type="button" (click)="onViewMenu.emit({ action: 'asignarMascota', row })">
+        <mat-icon>link</mat-icon>
+        <span>Asignar mascota</span>
+      </button>
+      <button mat-menu-item type="button" (click)="onViewMenu.emit({ action: 'elegirMascota', row })">
+        <mat-icon>pets</mat-icon>
+        <span>Elegir mascota y abrir ficha</span>
+      </button>
+    </ng-template>
+  </mat-menu>
+
+  <mat-paginator
+    [pageSize]="pageSize()"
+    [pageSizeOptions]="pageSizeOptions()"
+    [length]="serverSidePagination() ? totalCount() : filteredData().length"
+    [pageIndex]="currentPage()"
+    (page)="onPageEvent($event)"
+    showFirstLastButtons>
+  </mat-paginator>
+</div>
+

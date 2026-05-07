@@ -1,0 +1,192 @@
+<div class="turno-crear-modal">
+  <h2 mat-dialog-title class="turno-crear-modal__title">
+    Crear
+  </h2>
+
+  <mat-dialog-content class="turno-crear-modal__content">
+    @if (loadingData) {
+      <div class="d-flex justify-content-center align-items-center" style="min-height: 400px;">
+        <mat-spinner diameter="50"></mat-spinner>
+      </div>
+    } @else {
+      @if (error) {
+        <mat-card class="mb-3" appearance="outlined" style="background-color: #ffebee;">
+          <mat-card-content>
+            <div class="d-flex align-items-center">
+              <mat-icon style="color: #c62828; margin-right: 8px;">error</mat-icon>
+              <span>{{ error }}</span>
+            </div>
+          </mat-card-content>
+        </mat-card>
+      }
+
+      <div>
+          <form [formGroup]="form">
+            <div class="row">
+              <div class="col-12 col-md-6 mb-3">
+                <mat-form-field appearance="outline" class="w-100">
+                  <mat-label>Profesional *</mat-label>
+                  <mat-select formControlName="profesionalID">
+                    @for (p of profesionales; track p.id) {
+                      <mat-option [value]="p.id">{{ p.nombre }}</mat-option>
+                    }
+                  </mat-select>
+                  @if (form.get('profesionalID')?.hasError('required') && form.get('profesionalID')?.touched) {
+                    <mat-error>El profesional es requerido</mat-error>
+                  }
+                </mat-form-field>
+                @if (form.get('profesionalID')?.value && horariosLineas.length > 0) {
+                  <div class="turno-crear-modal__horarios">
+                    <strong>Horarios de atención:</strong>
+                    @for (linea of horariosLineas; track linea) {
+                      <div class="turno-crear-modal__horarios-linea">{{ linea }}</div>
+                    }
+                  </div>
+                }
+              </div>
+
+              <div class="col-12 col-md-6 mb-3">
+                <mat-form-field appearance="outline" class="w-100">
+                  <mat-label>Servicio *</mat-label>
+                  <mat-select formControlName="servicioID">
+                    @for (s of servicios; track s.id) {
+                      <mat-option [value]="s.id">{{ s.nombre }}</mat-option>
+                    }
+                  </mat-select>
+                  @if (form.get('servicioID')?.hasError('required') && form.get('servicioID')?.touched) {
+                    <mat-error>El servicio es requerido</mat-error>
+                  }
+                </mat-form-field>
+              </div>
+
+              <div class="col-12 col-md-6 mb-3">
+                <mat-form-field appearance="outline" class="w-100">
+                  <mat-label>Tipo de turno</mat-label>
+                  <mat-select formControlName="tipo">
+                    <mat-option value="CONSULTORIO">Consultorio</mat-option>
+                    <mat-option value="DOMICILIO">A domicilio</mat-option>
+                    <mat-option value="INTERNACION">Internación</mat-option>
+                  </mat-select>
+                </mat-form-field>
+              </div>
+
+              @if (mascotas.length > 0) {
+                <div class="col-12 col-md-6 mb-3">
+                  <mat-form-field appearance="outline" class="w-100">
+                    <mat-label>Mascota</mat-label>
+                    <mat-select formControlName="mascotaID">
+                      <mat-option [value]="null">Sin mascota</mat-option>
+                      @for (m of mascotas; track m.id) {
+                        <mat-option [value]="m.id">{{ m.nombre }}{{ m.especie ? ' (' + m.especie + ')' : '' }}</mat-option>
+                      }
+                    </mat-select>
+                  </mat-form-field>
+                </div>
+              }
+
+              <div class="col-12 col-md-6 mb-3">
+                <mat-form-field appearance="outline" class="w-100">
+                  <mat-label>Tutor</mat-label>
+                  <input
+                    matInput
+                    [formControl]="pacienteSearchControl"
+                    [matAutocomplete]="pacienteAuto"
+                    placeholder="Buscar por nombre o DNI..."
+                  />
+                  <mat-autocomplete
+                    #pacienteAuto="matAutocomplete"
+                    [displayWith]="displayTutor"
+                    (optionSelected)="onTutorSelected($event)"
+                  >
+                    <mat-option [value]="null">
+                      <em>Sin asignar</em>
+                    </mat-option>
+                    @for (p of pacientesFiltrados; track p.id) {
+                      <mat-option [value]="p">{{ p.nombre }} - DNI {{ p.dni }}</mat-option>
+                    }
+                  </mat-autocomplete>
+                  <mat-icon matPrefix>search</mat-icon>
+                </mat-form-field>
+              </div>
+
+              <div class="col-12 col-md-4 mb-3">
+                <mat-form-field appearance="outline" class="w-100">
+                  <mat-label>Fecha *</mat-label>
+                  <input matInput [matDatepicker]="picker" formControlName="fecha" />
+                  <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
+                  <mat-datepicker #picker></mat-datepicker>
+                  @if (form.get('fecha')?.hasError('required') && form.get('fecha')?.touched) {
+                    <mat-error>La fecha es requerida</mat-error>
+                  }
+                </mat-form-field>
+              </div>
+
+              <div class="col-12 col-md-4 mb-3">
+                <mat-form-field appearance="outline" class="w-100">
+                  <mat-label>Hora *</mat-label>
+                  <input matInput type="time" formControlName="hora" />
+                  @if (form.get('hora')?.hasError('required') && form.get('hora')?.touched) {
+                    <mat-error>La hora es requerida</mat-error>
+                  }
+                </mat-form-field>
+              </div>
+
+              <div class="col-12 col-md-4 mb-3">
+                <mat-form-field appearance="outline" class="w-100">
+                  <mat-label>Duración (minutos) *</mat-label>
+                  <input matInput type="number" formControlName="duracionMinutos" min="1" />
+                  @if (form.get('duracionMinutos')?.hasError('required') && form.get('duracionMinutos')?.touched) {
+                    <mat-error>La duración es requerida</mat-error>
+                  }
+                  @if (form.get('duracionMinutos')?.hasError('min') && form.get('duracionMinutos')?.touched) {
+                    <mat-error>La duración debe ser mayor a 0</mat-error>
+                  }
+                </mat-form-field>
+              </div>
+
+              <div class="col-12 col-md-6 mb-3">
+                <mat-form-field appearance="outline" class="w-100">
+                  <mat-label>Precio</mat-label>
+                  <input matInput type="number" formControlName="precio" min="0" step="0.01" />
+                </mat-form-field>
+              </div>
+
+              @if (fueraDeHorarioProfesional) {
+                <div class="col-12 mb-3">
+                  <mat-card class="turno-crear-modal__aviso-fuera-horario" appearance="outlined">
+                    <mat-card-content>
+                      <div class="d-flex align-items-center">
+                        <mat-icon>warning</mat-icon>
+                        <span>Está intentando sacar un turno fuera del horario de atención del profesional. Puede crearlo de todos modos.</span>
+                      </div>
+                    </mat-card-content>
+                  </mat-card>
+                </div>
+              }
+
+              <div class="col-12 mb-3">
+                <mat-form-field appearance="outline" class="w-100">
+                  <mat-label>Notas</mat-label>
+                  <textarea matInput formControlName="notas" rows="3"></textarea>
+                </mat-form-field>
+              </div>
+            </div>
+          </form>
+</div>
+    }
+  </mat-dialog-content>
+
+  <mat-dialog-actions align="end">
+    <button mat-stroked-button type="button" (click)="cancelar()" [disabled]="loading || loadingData">
+      Cancelar
+    </button>
+    <button mat-raised-button type="button" color="primary" (click)="crear()" [disabled]="loading || form.invalid || loadingData">
+      @if (loading) {
+        <mat-spinner diameter="20" class="me-2"></mat-spinner>
+        Creando...
+      } @else {
+        Crear Turno
+      }
+    </button>
+  </mat-dialog-actions>
+</div>

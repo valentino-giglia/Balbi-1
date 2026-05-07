@@ -1,0 +1,85 @@
+<div class="turnos-pendientes-page">
+  <div class="page-header">
+    <h1>Turnos Pendientes</h1>
+    <p class="subtitle">Gestioná los turnos reservados desde el chatbot que requieren confirmación</p>
+  </div>
+
+  @if (loading()) {
+    <app-loading-spinner></app-loading-spinner>
+  } @else {
+    @if (turnosPendientes().length === 0) {
+      <div class="empty-state">
+        <mat-icon>event_busy</mat-icon>
+        <h2>No hay turnos pendientes</h2>
+        <p>No hay turnos que requieran confirmación en este momento.</p>
+      </div>
+    } @else {
+      <div class="table-container">
+        <table mat-table [dataSource]="paginatedData" class="turnos-table">
+          <ng-container matColumnDef="tutor">
+            <th mat-header-cell *matHeaderCellDef>Tutor</th>
+            <td mat-cell *matCellDef="let row">{{ row.tutor }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="telefono">
+            <th mat-header-cell *matHeaderCellDef>Teléfono</th>
+            <td mat-cell *matCellDef="let row">{{ row.telefono }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="fechaHora">
+            <th mat-header-cell *matHeaderCellDef>Fecha y Hora</th>
+            <td mat-cell *matCellDef="let row">{{ row.fechaHora }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="servicio">
+            <th mat-header-cell *matHeaderCellDef>Servicio</th>
+            <td mat-cell *matCellDef="let row">{{ row.servicio }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="profesional">
+            <th mat-header-cell *matHeaderCellDef>Profesional</th>
+            <td mat-cell *matCellDef="let row">{{ row.profesional }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="actions">
+            <th mat-header-cell *matHeaderCellDef>Acciones</th>
+            <td mat-cell *matCellDef="let row" class="actions-cell">
+              <button 
+                mat-icon-button 
+                (click)="confirmarTurno(row)"
+                matTooltip="Confirmar turno">
+                <mat-icon>check_circle</mat-icon>
+              </button>
+              <button 
+                mat-icon-button 
+                (click)="cancelarTurno(row)"
+                matTooltip="Cancelar turno">
+                <mat-icon>cancel</mat-icon>
+              </button>
+              @if (row._original.pacienteID && row._original.paciente) {
+                <button 
+                  mat-icon-button 
+                  (click)="irAlChat(row)"
+                  matTooltip="Ir al chat">
+                  <mat-icon>chat</mat-icon>
+                </button>
+              }
+            </td>
+          </ng-container>
+
+          <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+          <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
+        </table>
+
+        <mat-paginator
+          [pageSize]="pageSize"
+          [pageSizeOptions]="pageSizeOptions"
+          [length]="totalItems"
+          [pageIndex]="pageIndex"
+          (page)="onPageChange($event)"
+          showFirstLastButtons>
+        </mat-paginator>
+      </div>
+    }
+  }
+</div>

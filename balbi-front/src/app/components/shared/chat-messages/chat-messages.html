@@ -1,0 +1,94 @@
+<div class="chat-messages">
+  @if (loading()) {
+    <app-loading-spinner></app-loading-spinner>
+  } @else {
+    @if (error()) {
+      <div class="alert alert-danger mb-3">{{ error() }}</div>
+    }
+
+    @if (mensajes().length === 0) {
+      <mat-card>
+        <mat-card-content>
+          <p class="text-center text-muted">No hay mensajes</p>
+        </mat-card-content>
+      </mat-card>
+    } @else {
+      <div class="messages-wrapper">
+        <div class="messages-container" #messagesContainer (scroll)="onScroll()">
+          @if (loadingMore()) {
+            <div class="loading-more">
+              <mat-spinner diameter="24"></mat-spinner>
+              <span>Cargando más mensajes...</span>
+            </div>
+          }
+          @for (mensaje of mensajes(); track mensaje.id) {
+            <div class="message-item" [class.sent]="isSent(mensaje)" [class.received]="!isSent(mensaje)" [class.new-message-whatsapp]="mensaje.id === mensajeRecienLlegadoId()">
+              <mat-card class="message-card">
+                <mat-card-content>
+                  <app-message-content
+                    [type]="mensaje.type"
+                    [text]="mensaje.text"
+                    [imageUrl]="mensaje.imageUrl"
+                    [audioUrl]="mensaje.audioUrl"
+                    [videoUrl]="mensaje.videoUrl"
+                    [documentUrl]="mensaje.documentUrl"
+                    [transcript]="mensaje.transcript">
+                  </app-message-content>
+                  <div class="message-meta">
+                    <span class="message-time">{{ formatDate(mensaje.timestamp) }}</span>
+                    @if (mensaje.status) {
+                      <mat-icon class="status-icon">{{ getStatusIcon(mensaje.status) }}</mat-icon>
+                    }
+                  </div>
+                </mat-card-content>
+              </mat-card>
+            </div>
+          }
+        </div>
+        @if (mostrarBotonNuevosMensajes()) {
+          <button type="button" class="btn-nuevos-mensajes" (click)="irAbajoNuevosMensajes()">
+            <mat-icon>arrow_downward</mat-icon>
+            <span>Mensajes nuevos</span>
+          </button>
+        }
+      </div>
+    }
+
+    @if (!loading() && mensajes().length > 0) {
+      <div class="message-input-container">
+        @if (contextWindowOpen()) {
+          <form [formGroup]="form" (ngSubmit)="enviarMensaje()" class="message-form">
+            <mat-form-field appearance="outline" class="message-input-field">
+              <textarea 
+                matInput 
+                formControlName="message" 
+                rows="1"
+                placeholder="Escribe un mensaje..."
+                #messageInput>
+              </textarea>
+            </mat-form-field>
+            <button 
+              mat-icon-button 
+              color="primary" 
+              type="submit" 
+              [disabled]="form.invalid || sending()"
+              class="send-button"
+              matTooltip="Enviar mensaje">
+              @if (sending()) {
+                <mat-spinner diameter="24"></mat-spinner>
+              } @else {
+                <mat-icon>send</mat-icon>
+              }
+            </button>
+          </form>
+        } @else {
+          <div class="context-window-closed">
+            <mat-icon>info</mat-icon>
+            <span>La ventana de contexto de WhatsApp está cerrada</span>
+          </div>
+        }
+      </div>
+    }
+  }
+</div>
+

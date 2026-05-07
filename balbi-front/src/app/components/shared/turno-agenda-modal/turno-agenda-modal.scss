@@ -1,0 +1,101 @@
+.turno-agenda-modal {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  max-height: 100vh;
+}
+
+.turno-agenda-modal__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 20px;
+  border-bottom: 1px solid #e0e0e0;
+  background-color: #ffffff;
+}
+
+.turno-agenda-modal__title-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+
+  h2 {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 600;
+  }
+
+  .subtitle {
+    margin: 0;
+    font-size: 13px;
+    color: #666;
+  }
+}
+
+.turno-agenda-modal__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  .week-label {
+    font-size: 14px;
+    color: #333;
+    font-weight: 500;
+    margin: 0 4px;
+  }
+}
+
+.turno-agenda-modal__body {
+  flex: 1;
+  min-height: 0;
+  padding: 12px 16px 16px;
+  background-color: #f5f5f5;
+  display: flex;
+  flex-direction: column;
+}
+
+.turno-agenda-modal__loading {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.turno-agenda-modal__error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  margin-bottom: 12px;
+  border-left: 4px solid #c62828;
+  background-color: #ffebee;
+  color: #c62828;
+
+  mat-icon {
+    color: #c62828;
+  }
+}
+
+.turno-agenda-modal__calendar-wrapper {
+  flex: 1;
+  min-height: 0;
+  background-color: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  padding: 8px;
+}
+
+@media (max-width: 900px) {
+  .turno-agenda-modal__header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .turno-agenda-modal__actions {
+    width: 100%;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+  }
+}
+

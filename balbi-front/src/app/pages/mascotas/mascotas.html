@@ -1,0 +1,35 @@
+<div class="mascotas-page">
+  <div class="row align-items-center justify-content-between mb-3">
+    <div class="col-auto">
+      <h1 class="m-0">Mascotas</h1>
+    </div>
+    <div class="col-auto">
+      <button mat-raised-button color="primary" (click)="crearMascota()">
+        <mat-icon>add</mat-icon>
+        Crear mascota
+      </button>
+    </div>
+  </div>
+
+  @if (loading()) {
+    <app-loading-spinner></app-loading-spinner>
+  } @else {
+    <app-data-table
+      [columns]="columns"
+      [data]="mascotas()"
+      [loading]="loading()"
+      [showSearch]="true"
+      [showViewAction]="true"
+      [serverSidePagination]="true"
+      [totalCount]="totalCount()"
+      [currentPageIndex]="currentPage()"
+      [pageSize]="pageSize()"
+      [currentSearchTerm]="searchTerm()"
+      (onView)="onView($event)"
+      (onEdit)="onEdit($event)"
+      (onDelete)="onDelete($event)"
+      (onPageChange)="onPageChange($event)"
+      (onSearch)="onSearch($event)">
+    </app-data-table>
+  }
+</div>

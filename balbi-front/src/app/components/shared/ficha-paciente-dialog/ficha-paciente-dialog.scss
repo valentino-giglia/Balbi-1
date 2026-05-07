@@ -1,0 +1,36 @@
+.ficha-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px 0;
+  min-width: 500px;
+
+  .form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+
+    .full-width {
+      grid-column: 1 / -1;
+    }
+  }
+
+  mat-form-field {
+    width: 100%;
+  }
+}
+
+mat-dialog-content {
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+@media (max-width: 600px) {
+  .ficha-form {
+    min-width: auto;
+
+    .form-row {
+      grid-template-columns: 1fr;
+    }
+  }
+}

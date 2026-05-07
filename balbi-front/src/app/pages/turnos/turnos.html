@@ -1,0 +1,195 @@
+<div class="turnos-page">
+  <div class="row align-items-center justify-content-between mb-3">
+    <div class="col-auto">
+      <h1 class="m-0">Turnos</h1>
+    </div>
+   
+  </div>
+
+  @if (loading()) {
+    <app-loading-spinner></app-loading-spinner>
+  } @else {
+    @if (error()) {
+      <div class="alert alert-danger mb-3">{{ error() }}</div>
+    }
+
+    <div class="calendar-demo mb-4">
+      <div class="calendar-demo__header">
+        <div class="calendar-demo__title">
+          <h2 class="m-0">Calendario</h2>
+          <span class="calendar-demo__subtle">{{ calendarWeekLabel() }}</span>
+        </div>
+
+        <div class="calendar-demo__nav">
+          <button
+            mat-icon-button
+            type="button"
+            (click)="openCalendarModal()"
+            matTooltip="Expandir calendario en pantalla completa"
+            aria-label="Expandir calendario"
+            class="calendar-demo__expand-btn"
+          >
+            <mat-icon>open_in_full</mat-icon>
+          </button>
+          <button
+            mat-icon-button
+            type="button"
+            (click)="toggleFilters()"
+            [matTooltip]="filtersVisible() ? 'Ocultar filtros' : 'Mostrar filtros'"
+            [attr.aria-label]="filtersVisible() ? 'Ocultar filtros' : 'Mostrar filtros'"
+            class="calendar-demo__expand-btn"
+          >
+            <mat-icon>{{ filtersVisible() ? 'expand_less' : 'expand_more' }}</mat-icon>
+          </button>
+          <button
+            mat-icon-button
+            type="button"
+            [matMenuTriggerFor]="horariosMenu"
+            matTooltip="Ver horarios de atención por profesional"
+            aria-label="Horarios del profesional"
+            class="calendar-demo__expand-btn"
+          >
+            <mat-icon>schedule</mat-icon>
+          </button>
+          <mat-menu #horariosMenu="matMenu" class="horarios-profesional-menu">
+            <button mat-menu-item (click)="selectHorariosProfesional(null)">
+              <mat-icon>clear</mat-icon>
+              <span>Ninguno</span>
+            </button>
+            @for (p of profesionales(); track p.id) {
+              <button mat-menu-item (click)="selectHorariosProfesional(p.id)">
+                <span>{{ p.nombre }}</span>
+              </button>
+            }
+          </mat-menu>
+          <button mat-stroked-button color="primary" type="button" (click)="prevWeek()">
+            <mat-icon>chevron_left</mat-icon>
+            Semana anterior
+          </button>
+          <button mat-stroked-button color="primary" type="button" (click)="today()">Hoy</button>
+          <button mat-stroked-button color="primary" type="button" (click)="nextWeek()">
+            Semana siguiente
+            <mat-icon>chevron_right</mat-icon>
+          </button>
+        </div>
+      </div>
+
+      @if (horariosProfesionalSelected() !== null) {
+        <div class="calendar-demo__horarios-texto">
+          @if (horariosLoading()) {
+            <span class="calendar-demo__horarios-loading">
+              <mat-icon class="calendar-demo__horarios-loading-icon">schedule</mat-icon>
+              Cargando horarios...
+            </span>
+          } @else if (horariosLineas().length > 0) {
+            <strong>Horarios de atención:</strong>
+            @for (linea of horariosLineas(); track linea) {
+              <div class="calendar-demo__horarios-linea">{{ linea }}</div>
+            }
+          }
+        </div>
+      }
+
+      <div class="calendar-demo__content">
+        <div class="calendar-demo__main">
+          <app-agenda-calendar
+            [viewDate]="calendarViewDate()"
+            [events]="calendarEvents()"
+            [weekStartsOn]="1"
+            [startHour]="7"
+            [endHour]="21"
+            [hourHeight]="84"
+            [availabilityRangesByDay]="availabilityRangesByDay()"
+            [availabilityTooltipLabel]="availabilityTooltipLabel()"
+            (eventClick)="onCalendarEventClick($event)"
+            (cellClick)="onCalendarCellClick($event.day, $event.hour, $event.minute)"
+          ></app-agenda-calendar>
+        </div>
+
+        @if (filtersVisible()) {
+          <div class="calendar-demo__sidebar">
+            <div class="filters-panel">
+              <h3 class="filters-panel__title">Filtros</h3>
+
+            <!-- Servicios -->
+            <mat-expansion-panel 
+              [expanded]="serviciosExpanded()" 
+              (opened)="serviciosExpanded.set(true)"
+              (closed)="serviciosExpanded.set(false)"
+              class="filter-panel"
+            >
+              <mat-expansion-panel-header>
+                <mat-panel-title>
+                  <mat-icon>medical_services</mat-icon>
+                  Servicios
+                </mat-panel-title>
+              </mat-expansion-panel-header>
+              <div class="filter-options">
+                <mat-checkbox
+                  [checked]="isTodosServiciosSelected()"
+                  (change)="onServiciosTodosToggle($event.checked)"
+                  [indeterminate]="isServiciosIndeterminado()"
+                  class="filter-option filter-option--all"
+                >
+                  Todos
+                </mat-checkbox>
+                @for (servicio of servicios(); track servicio.id) {
+                  <mat-checkbox
+                    [checked]="isServicioSelected(servicio.id)"
+                    (change)="onServicioToggle(servicio.id, $event.checked)"
+                    class="filter-option"
+                  >
+                    <div class="filter-option__content">
+                      <span 
+                        class="filter-option__color-indicator"
+                        [style.background-color]="servicio.color || '#1976d2'"
+                        [title]="servicio.color || '#1976d2'"
+                      ></span>
+                      <span class="filter-option__label">{{ servicio.nombre }}</span>
+                    </div>
+                  </mat-checkbox>
+                }
+              </div>
+            </mat-expansion-panel>
+
+            <!-- Profesionales -->
+            <mat-expansion-panel 
+              [expanded]="profesionalesExpanded()" 
+              (opened)="profesionalesExpanded.set(true)"
+              (closed)="profesionalesExpanded.set(false)"
+              class="filter-panel"
+            >
+              <mat-expansion-panel-header>
+                <mat-panel-title>
+                  <mat-icon>person</mat-icon>
+                  Profesionales
+                </mat-panel-title>
+              </mat-expansion-panel-header>
+              <div class="filter-options">
+                <mat-checkbox
+                  [checked]="isTodosProfesionalesSelected()"
+                  (change)="onProfesionalesTodosToggle($event.checked)"
+                  [indeterminate]="isProfesionalesIndeterminado()"
+                  class="filter-option filter-option--all"
+                >
+                  Todos
+                </mat-checkbox>
+                @for (profesional of profesionales(); track profesional.id) {
+                  <mat-checkbox
+                    [checked]="isProfesionalSelected(profesional.id)"
+                    (change)="onProfesionalToggle(profesional.id, $event.checked)"
+                    class="filter-option"
+                  >
+                    {{ profesional.nombre }}
+                  </mat-checkbox>
+                }
+              </div>
+            </mat-expansion-panel>
+            </div>
+          </div>
+        }
+      </div>
+    </div>
+  }
+</div>
+

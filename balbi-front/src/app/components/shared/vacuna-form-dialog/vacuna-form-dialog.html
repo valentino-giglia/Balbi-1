@@ -1,0 +1,36 @@
+<div class="vacuna-form-dialog">
+  <h2 mat-dialog-title>{{ titulo }}</h2>
+  <mat-dialog-content>
+    @if (error) {
+      <p class="error-msg">{{ error }}</p>
+    }
+    <form [formGroup]="form">
+      <mat-form-field appearance="outline" class="w-100">
+        <mat-label>Nombre de la vacuna *</mat-label>
+        <input matInput formControlName="nombre" placeholder="Ej. Antirrábica" />
+      </mat-form-field>
+      <mat-form-field appearance="outline" class="w-100">
+        <mat-label>Fecha de aplicación *</mat-label>
+        <input matInput [matDatepicker]="picker" formControlName="fechaAplicacion" />
+        <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
+        <mat-datepicker #picker></mat-datepicker>
+      </mat-form-field>
+      <mat-form-field appearance="outline" class="w-100">
+        <mat-label>Próxima dosis</mat-label>
+        <input matInput [matDatepicker]="picker2" formControlName="proximaDosis" />
+        <mat-datepicker-toggle matSuffix [for]="picker2"></mat-datepicker-toggle>
+        <mat-datepicker #picker2></mat-datepicker>
+      </mat-form-field>
+      <mat-form-field appearance="outline" class="w-100">
+        <mat-label>Notas</mat-label>
+        <textarea matInput formControlName="notas" rows="2"></textarea>
+      </mat-form-field>
+    </form>
+  </mat-dialog-content>
+  <mat-dialog-actions align="end">
+    <button mat-stroked-button (click)="cancelar()" [disabled]="loading">Cancelar</button>
+    <button mat-raised-button color="primary" (click)="guardar()" [disabled]="loading || form.invalid">
+      @if (loading) { Guardando... } @else { Guardar }
+    </button>
+  </mat-dialog-actions>
+</div>

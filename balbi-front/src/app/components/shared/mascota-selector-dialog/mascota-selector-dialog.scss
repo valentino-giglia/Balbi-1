@@ -1,0 +1,52 @@
+.mascota-selector-dialog {
+  .subtitle {
+    margin: 0 0 12px 0;
+    font-size: 14px;
+    color: rgba(0, 0, 0, 0.7);
+  }
+
+  .loading-wrapper {
+    display: flex;
+    justify-content: center;
+    padding: 24px 0;
+  }
+
+  .error-msg {
+    color: #c62828;
+    font-size: 13px;
+  }
+
+  .empty-msg {
+    font-size: 13px;
+    color: rgba(0, 0, 0, 0.6);
+  }
+
+  .mascota-list {
+    max-height: 260px;
+    overflow-y: auto;
+    margin-top: 4px;
+  }
+
+  .mascota-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+
+    .mascota-main {
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+    }
+
+    .mascota-nombre {
+      font-weight: 600;
+    }
+
+    .mascota-especie,
+    .mascota-raza {
+      font-size: 12px;
+      color: rgba(0, 0, 0, 0.6);
+    }
+  }
+}
+

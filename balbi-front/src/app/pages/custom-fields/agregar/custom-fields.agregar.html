@@ -1,0 +1,83 @@
+<div class="custom-fields-agregar-page">
+  <div class="row align-items-center mb-3">
+    <div class="col-auto">
+      <h1 class="m-0">Nuevo campo personalizado</h1>
+    </div>
+  </div>
+
+  @if (error()) {
+    <div class="alert alert-danger mb-3">{{ error() }}</div>
+  }
+
+  <form [formGroup]="form" (ngSubmit)="onSubmit()">
+    <div class="row">
+      <div class="col-md-6 mb-3">
+        <mat-form-field appearance="outline" class="w-100">
+          <mat-label>Etiqueta *</mat-label>
+          <input matInput formControlName="label" required placeholder="Ej: Peso, Altura">
+          @if (form.get('label')?.hasError('required') && form.get('label')?.touched) {
+            <mat-error>La etiqueta es requerida</mat-error>
+          }
+        </mat-form-field>
+      </div>
+
+      <div class="col-md-6 mb-3">
+        <mat-form-field appearance="outline" class="w-100">
+          <mat-label>Clave (interna) *</mat-label>
+          <input matInput formControlName="key" required placeholder="ej: peso, altura">
+          <mat-hint>Se genera desde la etiqueta. Solo letras minúsculas, números y guión bajo.</mat-hint>
+          @if (form.get('key')?.hasError('required') && form.get('key')?.touched) {
+            <mat-error>La clave es requerida</mat-error>
+          }
+        </mat-form-field>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col-md-4 mb-3">
+        <mat-form-field appearance="outline" class="w-100">
+          <mat-label>Tipo</mat-label>
+          <mat-select formControlName="type">
+            @for (opt of typeOptions; track opt.value) {
+              <mat-option [value]="opt.value">{{ opt.label }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+      </div>
+
+      <div class="col-md-4 mb-3">
+        <mat-form-field appearance="outline" class="w-100">
+          <mat-label>Ámbito *</mat-label>
+          <mat-select formControlName="scope">
+            @for (opt of scopeOptions; track opt.value) {
+              <mat-option [value]="opt.value">{{ opt.label }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+      </div>
+
+      <div class="col-md-4 mb-3">
+        <mat-form-field appearance="outline" class="w-100">
+          <mat-label>Orden</mat-label>
+          <input matInput type="number" formControlName="orden" min="0">
+        </mat-form-field>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col-12">
+        <button mat-raised-button type="button" (click)="cancelar()" class="me-2">
+          Cancelar
+        </button>
+        <button mat-raised-button color="primary" type="submit" [disabled]="loading()">
+          @if (loading()) {
+            <app-loading-spinner></app-loading-spinner>
+          } @else {
+            Guardar
+          }
+        </button>
+      </div>
+    </div>
+  </form>
+</div>
+

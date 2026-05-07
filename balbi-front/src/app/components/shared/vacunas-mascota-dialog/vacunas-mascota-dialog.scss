@@ -1,0 +1,61 @@
+.vacunas-mascota-dialog {
+  .vacunas-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 24px;
+    p {
+      margin: 0;
+      color: #6b7280;
+      font-size: 14px;
+    }
+  }
+
+  .vacunas-error {
+    color: #dc2626;
+    padding: 16px;
+    margin: 0;
+  }
+
+  .vacunas-actions {
+    margin-bottom: 16px;
+  }
+
+  .vacunas-empty {
+    padding: 16px 0;
+    margin: 0;
+    color: #6b7280;
+    font-size: 14px;
+  }
+
+  .vacunas-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .vacuna-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid #f3f4f6;
+
+    &:last-child {
+      border-bottom: none;
+    }
+  }
+
+  .vacuna-nombre {
+    font-weight: 500;
+    flex: 1;
+    color: #111827;
+  }
+
+  .vacuna-fecha,
+  .vacuna-proxima {
+    font-size: 13px;
+    color: #6b7280;
+  }
+}

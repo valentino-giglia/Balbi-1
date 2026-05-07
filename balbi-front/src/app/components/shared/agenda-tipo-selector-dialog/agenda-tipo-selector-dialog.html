@@ -1,0 +1,21 @@
+<h2 mat-dialog-title>¿Qué deseas agregar?</h2>
+<mat-dialog-content>
+  <p class="agenda-tipo-selector__subtitle">Elegí el tipo de ítem para la agenda:</p>
+  <div class="agenda-tipo-selector__actions">
+    <button mat-stroked-button color="primary" (click)="elegir('turno')" class="agenda-tipo-selector__btn">
+      <mat-icon>event</mat-icon>
+      Turno
+    </button>
+    <button mat-stroked-button color="primary" (click)="elegir('evento')" class="agenda-tipo-selector__btn">
+      <mat-icon>local_shipping</mat-icon>
+      Evento (traslado, muestras, cadetería)
+    </button>
+    <button mat-stroked-button (click)="elegir('bloqueo')" class="agenda-tipo-selector__btn">
+      <mat-icon>block</mat-icon>
+      Bloqueo
+    </button>
+  </div>
+</mat-dialog-content>
+<mat-dialog-actions align="end">
+  <button mat-button (click)="cancelar()">Cancelar</button>
+</mat-dialog-actions>

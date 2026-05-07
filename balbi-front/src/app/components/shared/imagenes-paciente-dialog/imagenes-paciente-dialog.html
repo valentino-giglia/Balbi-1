@@ -1,0 +1,102 @@
+<h2 mat-dialog-title>{{ data.turnoID != null ? 'Archivos de esta consulta' : 'Imágenes y documentos de la mascota' }}</h2>
+
+<mat-dialog-content>
+  <div class="imagenes-container">
+    <div class="upload-section">
+      <button mat-raised-button color="primary" (click)="onSeleccionarArchivos()" [disabled]="uploading">
+        <mat-icon>add_photo_alternate</mat-icon>
+        {{ uploading ? 'Subiendo...' : 'Seleccionar archivos' }}
+      </button>
+      <input 
+        #fileInput 
+        type="file" 
+        accept="image/*,application/pdf" 
+        multiple 
+        (change)="onArchivosSeleccionados($event)"
+        style="display: none;">
+    </div>
+
+    @if (loading) {
+      <div class="loading-state">
+        <mat-spinner diameter="40"></mat-spinner>
+        <p>Cargando archivos...</p>
+      </div>
+    }
+
+    <div class="imagenes-grid" *ngIf="!loading && imagenes.length > 0">
+      <div class="imagen-item" *ngFor="let imagen of imagenes; let i = index">
+        @if (esImagen(imagen)) {
+          <div class="imagen-wrapper" (click)="abrirPreview(imagen, i)">
+            <img [src]="imagen.url" [alt]="imagen.descripcion || 'Imagen de la mascota'">
+            <div class="imagen-overlay">
+              <mat-icon>zoom_in</mat-icon>
+            </div>
+          </div>
+        } @else {
+          <div class="documento-wrapper" (click)="abrirPreview(imagen, i)">
+            <mat-icon class="doc-icon">picture_as_pdf</mat-icon>
+            <span class="doc-label">PDF</span>
+          </div>
+        }
+        <button mat-icon-button color="warn" class="delete-btn" (click)="eliminarImagen(i); $event.stopPropagation()">
+          <mat-icon>delete</mat-icon>
+        </button>
+        <div class="imagen-info">
+          <small>{{ formatearFecha(imagen.fecha) }}</small>
+          <small *ngIf="imagen.descripcion">{{ imagen.descripcion }}</small>
+        </div>
+      </div>
+    </div>
+
+    <!-- Vista Previa (solo imágenes) -->
+    @if (imagenPreview && esImagen(imagenPreview)) {
+      <div class="preview-overlay" (click)="cerrarPreview()">
+        <div class="preview-container" (click)="$event.stopPropagation()">
+          <button mat-icon-button class="preview-close" (click)="cerrarPreview()">
+            <mat-icon>close</mat-icon>
+          </button>
+          @if (puedeIrAnterior()) {
+            <button mat-icon-button class="preview-nav preview-nav-left" (click)="imagenAnterior()">
+              <mat-icon>chevron_left</mat-icon>
+            </button>
+          }
+          <div class="preview-image-wrapper">
+            <img [src]="imagenPreview.url" [alt]="imagenPreview.descripcion || 'Imagen de la mascota'">
+            <div class="preview-info">
+              <p class="preview-descripcion">{{ imagenPreview.descripcion || 'Sin descripción' }}</p>
+              <p class="preview-fecha">{{ formatearFecha(imagenPreview.fecha) }}</p>
+              <p class="preview-indice">{{ indicePreview + 1 }} / {{ imagenes.length }}</p>
+            </div>
+          </div>
+          @if (puedeIrSiguiente()) {
+            <button mat-icon-button class="preview-nav preview-nav-right" (click)="imagenSiguiente()">
+              <mat-icon>chevron_right</mat-icon>
+            </button>
+          }
+        </div>
+      </div>
+    }
+
+    @if (!loading && imagenes.length === 0) {
+      <div class="empty-state">
+        <mat-icon>folder_open</mat-icon>
+        <p>No hay archivos cargados</p>
+      </div>
+    }
+
+    @if (!loading && total > 0) {
+      <mat-paginator
+        [length]="total"
+        [pageSize]="pageSize"
+        [pageIndex]="page - 1"
+        [pageSizeOptions]="[12, 24, 48]"
+        (page)="onPaginate($event)">
+      </mat-paginator>
+    }
+  </div>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button (click)="onCancelar()">Cancelar</button>
+  <button mat-raised-button color="primary" (click)="onGuardar()">Cerrar</button>
+</mat-dialog-actions>

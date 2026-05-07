@@ -1,0 +1,14 @@
+<div class="dashboard-layout">
+  <app-sidebar [collapsed]="sidebarCollapsed()"></app-sidebar>
+  <div class="main-content">
+    <app-header
+      [title]="pageTitle()"
+      [sidebarCollapsed]="sidebarCollapsed()"
+      (toggleSidebar)="onToggleSidebar()">
+    </app-header>
+    <main class="content-area">
+      <router-outlet></router-outlet>
+    </main>
+  </div>
+</div>
+

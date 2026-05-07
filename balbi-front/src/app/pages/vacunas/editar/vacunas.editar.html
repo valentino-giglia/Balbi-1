@@ -1,0 +1,85 @@
+<div class="vacunas-editar-page">
+  <div class="row align-items-center mb-3">
+    <div class="col-auto">
+      <h1 class="m-0">Editar vacuna</h1>
+    </div>
+  </div>
+
+  @if (loadingData()) {
+    <app-loading-spinner></app-loading-spinner>
+  } @else {
+    @if (error()) {
+      <div class="alert alert-danger mb-3">{{ error() }}</div>
+    }
+
+    <form [formGroup]="form" (ngSubmit)="onSubmit()">
+      <div class="row">
+        <div class="col-md-6 mb-3">
+          <mat-form-field appearance="outline" class="w-100">
+            <mat-label>Mascota *</mat-label>
+            <mat-select formControlName="mascotaID" required>
+              <mat-option [value]="null">Seleccionar mascota</mat-option>
+              @for (m of mascotas; track m.id) {
+                <mat-option [value]="m.id">{{ m.nombre }}{{ m.paciente?.nombre ? ' (' + m.paciente?.nombre + ')' : '' }}</mat-option>
+              }
+            </mat-select>
+            @if (form.get('mascotaID')?.hasError('required') && form.get('mascotaID')?.touched) {
+              <mat-error>La mascota es requerida</mat-error>
+            }
+          </mat-form-field>
+        </div>
+
+        <div class="col-md-6 mb-3">
+          <mat-form-field appearance="outline" class="w-100">
+            <mat-label>Nombre de la vacuna *</mat-label>
+            <input matInput formControlName="nombre" required placeholder="ej. Antirrábica">
+            @if (form.get('nombre')?.hasError('required') && form.get('nombre')?.touched) {
+              <mat-error>El nombre es requerido</mat-error>
+            }
+          </mat-form-field>
+        </div>
+
+        <div class="col-md-6 mb-3">
+          <mat-form-field appearance="outline" class="w-100">
+            <mat-label>Fecha de aplicación *</mat-label>
+            <input matInput [matDatepicker]="picker" formControlName="fechaAplicacion">
+            <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
+            <mat-datepicker #picker></mat-datepicker>
+            @if (form.get('fechaAplicacion')?.hasError('required') && form.get('fechaAplicacion')?.touched) {
+              <mat-error>La fecha es requerida</mat-error>
+            }
+          </mat-form-field>
+        </div>
+
+        <div class="col-md-6 mb-3">
+          <mat-form-field appearance="outline" class="w-100">
+            <mat-label>Próxima dosis</mat-label>
+            <input matInput [matDatepicker]="picker2" formControlName="proximaDosis">
+            <mat-datepicker-toggle matSuffix [for]="picker2"></mat-datepicker-toggle>
+            <mat-datepicker #picker2></mat-datepicker>
+          </mat-form-field>
+        </div>
+
+        <div class="col-md-12 mb-3">
+          <mat-form-field appearance="outline" class="w-100">
+            <mat-label>Notas</mat-label>
+            <textarea matInput formControlName="notas" rows="2"></textarea>
+          </mat-form-field>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col-12">
+          <button mat-raised-button type="button" (click)="cancelar()" class="me-2">Cancelar</button>
+          <button mat-raised-button color="primary" type="submit" [disabled]="loading()">
+            @if (loading()) {
+              <app-loading-spinner></app-loading-spinner>
+            } @else {
+              Guardar
+            }
+          </button>
+        </div>
+      </div>
+    </form>
+  }
+</div>

@@ -1,0 +1,163 @@
+<div class="profesionales-agregar-page">
+  <div class="row align-items-center mb-3">
+    <div class="col-auto">
+      <h1 class="m-0">Agregar Veterinario</h1>
+    </div>
+  </div>
+
+  @if (error()) {
+    <div class="alert alert-danger mb-3">{{ error() }}</div>
+  }
+
+  <form [formGroup]="form" (ngSubmit)="onSubmit()">
+    <div class="row">
+      <div class="col-md-6 mb-3">
+        <mat-form-field appearance="outline" class="w-100">
+          <mat-label>Nombre *</mat-label>
+          <input matInput formControlName="nombre" required>
+          @if (form.get('nombre')?.hasError('required') && form.get('nombre')?.touched) {
+            <mat-error>El nombre es requerido</mat-error>
+          }
+        </mat-form-field>
+      </div>
+
+      <div class="col-md-6 mb-3">
+        <mat-form-field appearance="outline" class="w-100">
+          <mat-label>Código (turno)</mat-label>
+          <input matInput formControlName="codigo" readonly>
+          <mat-hint>Se genera automáticamente desde el nombre. Se usa para reservar turnos.</mat-hint>
+        </mat-form-field>
+      </div>
+
+      <div class="col-md-6 mb-3">
+        <mat-form-field appearance="outline" class="w-100">
+          <mat-label>Teléfono</mat-label>
+          <input matInput formControlName="telefono">
+        </mat-form-field>
+      </div>
+
+      <div class="col-md-6 mb-3">
+        <mat-form-field appearance="outline" class="w-100">
+          <mat-label>Email</mat-label>
+          <input matInput type="email" formControlName="email">
+          @if (form.get('email')?.hasError('email') && form.get('email')?.touched) {
+            <mat-error>Email inválido</mat-error>
+          }
+        </mat-form-field>
+      </div>
+
+      <div class="col-md-6 mb-3">
+        <mat-form-field appearance="outline" class="w-100">
+          <mat-label>Color</mat-label>
+          <input matInput type="color" formControlName="color">
+        </mat-form-field>
+      </div>
+
+      <div class="col-12 mb-3">
+        <mat-form-field appearance="outline" class="w-100">
+          <mat-label>Servicios</mat-label>
+          <mat-select 
+            [value]="serviciosSeleccionados()" 
+            (selectionChange)="onServiciosChange($any($event).value)"
+            multiple>
+            @for (servicio of servicios(); track servicio.id) {
+              <mat-option [value]="servicio.id">{{ servicio.nombre }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+      </div>
+
+      <div class="col-12 mb-3">
+        <mat-form-field appearance="outline" class="w-100">
+          <mat-label>Detalles</mat-label>
+          <textarea matInput formControlName="detalles" rows="4"></textarea>
+        </mat-form-field>
+      </div>
+    </div>
+
+    <!-- Sección de Horarios -->
+    <div class="row mb-4">
+      <div class="col-12">
+        <h3 class="mb-3">Horarios de Disponibilidad</h3>
+        <div class="horarios-container">
+          @for (dia of diasSemana; track dia.codigo) {
+            <div class="horario-dia-row">
+              <div class="horario-dia-label">
+                {{ dia.nombre.substring(0, 3) }}
+              </div>
+              <div class="horario-dia-content">
+                @if (!tieneHorarios(dia)) {
+                  <span class="no-disponible">No disponible</span>
+                  <button 
+                    type="button" 
+                    mat-icon-button 
+                    class="btn-agregar-horario"
+                    (click)="agregarHorario(dia)"
+                    matTooltip="Agregar horario">
+                    <mat-icon>add_circle</mat-icon>
+                  </button>
+                } @else {
+                  @for (horario of dia.horarios; track horario.id || $index) {
+                    <div class="horario-slot">
+                      <input 
+                        type="time" 
+                        class="time-input"
+                        [(ngModel)]="horario.horaInicio"
+                        [ngModelOptions]="{standalone: true}">
+                      <span class="time-separator">—</span>
+                      <input 
+                        type="time" 
+                        class="time-input"
+                        [(ngModel)]="horario.horaFin"
+                        [ngModelOptions]="{standalone: true}">
+                      <button 
+                        type="button" 
+                        mat-icon-button 
+                        class="btn-accion-horario"
+                        (click)="eliminarHorario(dia, $index)"
+                        matTooltip="Eliminar horario">
+                        <mat-icon>cancel</mat-icon>
+                      </button>
+                      <button 
+                        type="button" 
+                        mat-icon-button 
+                        class="btn-accion-horario"
+                        (click)="agregarHorario(dia)"
+                        matTooltip="Agregar otro horario">
+                        <mat-icon>add_circle</mat-icon>
+                      </button>
+                      <button 
+                        type="button" 
+                        mat-icon-button 
+                        class="btn-accion-horario"
+                        (click)="duplicarHorario(dia, horario)"
+                        matTooltip="Duplicar horario">
+                        <mat-icon>content_copy</mat-icon>
+                      </button>
+                    </div>
+                  }
+                }
+              </div>
+            </div>
+          }
+        </div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col-12">
+        <button mat-raised-button type="button" (click)="cancelar()" class="me-2">
+          Cancelar
+        </button>
+        <button mat-raised-button color="primary" type="submit" [disabled]="loading()">
+          @if (loading()) {
+            <app-loading-spinner></app-loading-spinner>
+          } @else {
+            Guardar
+          }
+        </button>
+      </div>
+    </div>
+  </form>
+</div>
+

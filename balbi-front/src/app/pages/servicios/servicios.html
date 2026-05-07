@@ -1,0 +1,35 @@
+<div class="servicios-page">
+  <div class="row align-items-center justify-content-between mb-3">
+    <div class="col-auto">
+      <h1 class="m-0">Servicios</h1>
+    </div>
+    <div class="col-auto">
+      <button mat-raised-button color="primary" (click)="crearServicio()">
+        <mat-icon>add</mat-icon>
+        Nuevo Servicio
+      </button>
+    </div>
+  </div>
+
+  @if (loading()) {
+    <app-loading-spinner></app-loading-spinner>
+  } @else {
+    <app-data-table
+      [columns]="columns"
+      [data]="servicios()"
+      [loading]="loading()"
+      [showSearch]="true"
+      [showViewAction]="false"
+      [serverSidePagination]="true"
+      [totalCount]="totalCount()"
+      [currentPageIndex]="currentPage()"
+      [pageSize]="pageSize()"
+      [currentSearchTerm]="searchTerm()"
+      (onEdit)="onEdit($event)"
+      (onDelete)="onDelete($event)"
+      (onPageChange)="onPageChange($event)"
+      (onSearch)="onSearch($event)">
+    </app-data-table>
+  }
+</div>
+
