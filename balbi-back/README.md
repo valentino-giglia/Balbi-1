@@ -1,126 +1,170 @@
-# Dr. Balbi — Plataforma de Gestión Clínica
+# Dr. Balbi — Emergencias Veterinarias 🐾
 
-## Descripción
-
-Sistema de gestión para la clínica veterinaria Dr. Balbi. Incluye agenda, historia clínica, internación, mensajería y precios.
+Plataforma de gestión clínica veterinaria: historia clínica, turnos, internación, cola de atención, libreta sanitaria y más.
 
 ---
 
-## Requisitos previos
+## Requisitos
 
-- Node.js 18+
-- PostgreSQL 14+
-- Cuenta de Railway (deploy)
-- Cuenta de OpenAI (IA del chat)
-- Cuenta de Google Cloud (Calendar + Sheets + Firebase Storage)
+- [Node.js](https://nodejs.org/) v18 o superior
+- Base de datos MySQL (se recomienda [Railway](https://railway.app))
 
 ---
 
-## 1. Crear cuenta en Railway
+## Instalación
 
-Railway es la plataforma donde se despliega el backend.
+### 1. Clonar el repositorio
 
-### Pasos
-
-1. Ir a [https://railway.app](https://railway.app) y hacer clic en **Start a New Project**.
-2. Registrarse con la cuenta de Google o email del cliente:
-   - Email recomendado: `admin@drbalbi.com.ar` (o el que use el cliente)
-3. Una vez dentro, crear un **New Project** → seleccionar **Deploy from GitHub repo**.
-4. Conectar la cuenta de GitHub donde está el repositorio `balbi-back`.
-5. Railway detecta automáticamente el `package.json` y configura Node.js.
-
-### Variables de entorno en Railway
-
-En el proyecto de Railway → pestaña **Variables**, agregar:
-
-```
-DATABASE_URL=<URL de PostgreSQL — Railway puede provisionar una automáticamente>
-JWT_SECRET=<string aleatorio largo, ej: openssl rand -hex 32>
-JWT_EXPIRATION=8h
-AUTH_USER=admin
-AUTH_PASSWORD=<contraseña segura>
-API_KEY=<string aleatorio para la API interna>
-NODE_ENV=production
-FIREBASE_PROJECT_ID=<id del proyecto Firebase>
-FIREBASE_PRIVATE_KEY=<clave privada del service account, con saltos de línea como \n>
-FIREBASE_CLIENT_EMAIL=<email del service account Firebase>
-FIREBASE_STORAGE_BUCKET=<nombre del bucket, ej: drbalbi-app.appspot.com>
-OPENAI_API_KEY=<ver sección 2>
+```bash
+git clone https://github.com/valentino-giglia/Balbi-1.git
+cd Balbi-1/balbi-back
 ```
 
-### Base de datos PostgreSQL en Railway
-
-1. En el mismo proyecto de Railway → **+ New** → **Database** → **PostgreSQL**.
-2. Railway genera la variable `DATABASE_URL` automáticamente y la inyecta al servicio.
-3. Las tablas se crean automáticamente al iniciar el servidor (Sequelize sync).
-
-### Dominio
-
-- Railway asigna un dominio automático tipo `balbi-back.up.railway.app`.
-- Para dominio propio: **Settings** → **Networking** → **Custom Domain** → agregar `api.drbalbi.com.ar` y configurar el CNAME en el DNS.
-
----
-
-## 2. Crear cuenta en OpenAI
-
-La plataforma usa OpenAI para el asistente de chat con clientes.
-
-### Pasos
-
-1. Ir a [https://platform.openai.com](https://platform.openai.com) y hacer clic en **Sign up**.
-2. Registrarse con el email del cliente: `admin@drbalbi.com.ar`.
-3. Verificar el email y agregar un método de pago (tarjeta de crédito o prepaga).
-4. Ir a **API Keys** → **+ Create new secret key**.
-   - Nombre: `DrBalbi Producción`
-   - Copiar la clave (solo se muestra una vez).
-5. Pegar la clave en Railway como variable `OPENAI_API_KEY`.
-
-### Recomendaciones de uso
-
-- Establecer un **límite de gasto mensual** en Settings → Limits → Set monthly budget (ej: $30 USD/mes).
-- Usar modelo `gpt-4o-mini` para reducir costos (ya configurado en el código).
-
----
-
-## 3. Firebase Storage (para archivos e imágenes)
-
-Los estudios adjuntos se guardan en Firebase Storage.
-
-### Pasos
-
-1. Ir a [https://console.firebase.google.com](https://console.firebase.google.com) y crear un proyecto nuevo: `drbalbi-app`.
-2. En el proyecto → **Storage** → **Get Started** → elegir región `us-central1` (o la más cercana).
-3. En **Project Settings** → **Service Accounts** → **Generate new private key**.
-   - Descargar el archivo JSON.
-   - Copiar `project_id`, `private_key` y `client_email` a las variables de Railway.
-4. En Storage → **Rules** → asegurarse de que solo el backend autenticado pueda leer/escribir.
-
----
-
-## 4. Instalación local
+### 2. Instalar dependencias
 
 ```bash
 npm install
-cp .env.example .env   # completar las variables
-node server.js
 ```
 
-El servidor queda disponible en `http://localhost:3000`.
+### 3. Configurar variables de entorno
+
+Copiá el archivo de ejemplo y completá los valores:
+
+```bash
+cp .env.example .env
+```
+
+Editá `.env` con tus datos de base de datos y las claves secretas:
+
+```env
+DB_HOST=tu_host_mysql
+DB_USER=tu_usuario
+DB_PASSWORD=tu_password
+DB_NAME=tu_base_de_datos
+DB_PORT=3306
+
+JWT_SECRET=genera_uno_con_el_comando_de_abajo
+API_KEY=genera_uno_con_el_comando_de_abajo
+```
+
+Para generar claves seguras:
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
+### 4. Crear tablas y usuarios iniciales
+
+Este comando crea las tablas automáticamente y carga los 3 usuarios de acceso:
+
+```bash
+npm run seed
+```
+
+Credenciales creadas:
+
+| Rol         | Email                    | Contraseña   |
+|-------------|--------------------------|--------------|
+| Admin       | admin@drbalbi.vet        | Balbi2026!   |
+| Veterinario | mendez@drbalbi.vet       | Vet2026!     |
+| Recepción   | recepcion@drbalbi.vet    | Recep2026!   |
+
+### 5. Iniciar el servidor
+
+```bash
+npm start          # producción
+npm run dev        # desarrollo (con hot-reload)
+```
+
+Abrí el navegador en: **http://localhost:3000**
 
 ---
 
-## 5. Roles del sistema
+## Actualización de la base de datos
 
-| Rol         | Acceso                                                        |
-|-------------|---------------------------------------------------------------|
-| admin       | Todo el sistema + Configuración de usuarios y roles           |
-| veterinario | Dashboard, Agenda, Pacientes, Consultas, Libreta, Internación |
-| recepcion   | Dashboard, Agenda, Clientes, Mensajes                         |
-
-Los roles se asignan desde **Configuración → Usuarios y Roles** (solo admin).
+El servidor usa `sequelize.sync({ alter: true })`, lo que significa que **cada vez que iniciás el servidor se actualizan automáticamente las columnas y tablas** según los modelos. No necesitás correr migraciones manualmente.
 
 ---
 
-## 6. Soporte
+## Estructura del proyecto
 
-Para soporte técnico contactar al desarrollador.
+```
+balbi-back/
+├── server.js                    # Entry point
+├── seed.js                      # Carga roles y usuarios iniciales
+├── .env.example                 # Variables de entorno (plantilla)
+├── Dr_Balbi_Plataforma_v4.html  # Frontend (React + Babel standalone)
+│
+├── config/
+│   └── database.js              # Conexión MySQL con Sequelize
+│
+├── models/                      # Modelos Sequelize
+│   ├── index.js                 # Relaciones entre modelos
+│   ├── Usuario.js
+│   ├── Rol.js / UsuarioRol.js
+│   ├── Pacientes.js
+│   ├── Mascotas.js
+│   ├── Turnos.js
+│   ├── Consultas.js
+│   ├── LibretaItem.js
+│   ├── Vacunas.js
+│   ├── Fichas.js
+│   ├── Files.js
+│   ├── Servicios.js
+│   ├── Profesionales.js
+│   ├── Horarios.js
+│   ├── BloqueosAgenda.js
+│   └── EventosAgenda.js
+│
+├── controllers/                 # Lógica de negocio
+├── routes/                      # Endpoints de la API
+└── middleware/                  # Auth JWT + RBAC
+```
+
+---
+
+## Roles y permisos
+
+| Módulo               | Admin      | Veterinario    | Recepción |
+|----------------------|------------|----------------|-----------|
+| Dashboard / Guardia  | ✅ editar  | ✅ ver         | ✅ ver    |
+| Clientes             | ✅         | ✅             | ✅        |
+| Pacientes (mascotas) | ✅         | ✅             | ✅        |
+| Consultas            | ✅ siempre | ✅ ver+crear   | ❌        |
+| Libreta sanitaria    | ✅         | ✅             | ✅ ver    |
+| Internación          | ✅         | ✅             | ✅ ver    |
+| Configuración        | ✅         | ❌             | ❌        |
+
+---
+
+## API — Endpoints principales
+
+Todos los endpoints requieren header `Authorization: Bearer <token>` excepto `/api/auth/login`.
+
+```
+POST   /api/auth/login
+GET    /api/pacientes
+POST   /api/pacientes
+GET    /api/mascotas
+GET    /api/mascotas/:id
+PUT    /api/mascotas/:id
+GET    /api/consultas?mascotaID=
+POST   /api/consultas
+PUT    /api/consultas/:id
+GET    /api/libreta?mascotaID=
+POST   /api/libreta
+PUT    /api/libreta/:id
+DELETE /api/libreta/:id
+GET    /api/turnos?fechaInicio=&fechaFin=
+POST   /api/turnos
+GET    /api/vacunas?mascotaID=
+POST   /api/vacunas
+POST   /api/files       (multipart/form-data)
+GET    /api/servicios
+GET    /api/profesionales
+```
+
+---
+
+## Zona horaria
+
+La plataforma opera en **zona horaria Argentina (UTC-3, sin horario de verano)**. El reloj y todas las fechas se muestran en hora de Rosario / Buenos Aires.
