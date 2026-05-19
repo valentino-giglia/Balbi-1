@@ -32,8 +32,8 @@ const connectDB = async () => {
     console.log('✅ Conexión a MySQL establecida correctamente');
     
     // Sincronizar modelos (crear tablas si no existen)
-    //await sequelize.sync({ alter: true });
-    //console.log('✅ Modelos sincronizados con la base de datos');
+    await sequelize.sync({ alter: true });
+    console.log('✅ Modelos sincronizados con la base de datos');
     
     return sequelize;
   } catch (error) {

@@ -7,14 +7,15 @@ const router = express.Router();
 const storage = multer.memoryStorage();
 const upload = multer({
   storage,
-  limits: { fileSize: 20 * 1024 * 1024 }, // 20 MB (imágenes y PDF)
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50 MB
   fileFilter: (req, file, cb) => {
     const isImage = /^image\/(jpeg|jpg|png|gif|webp)$/i.test(file.mimetype);
     const isPdf = file.mimetype === 'application/pdf';
-    if (isImage || isPdf) {
+    const isVideo = /^video\/(mp4|quicktime|x-msvideo)$/i.test(file.mimetype);
+    if (isImage || isPdf || isVideo) {
       cb(null, true);
     } else {
-      cb(new Error('Se permiten imágenes (jpeg, png, gif, webp) y documentos PDF'), false);
+      cb(new Error('Se permiten imágenes (jpeg, png, gif, webp), PDF y video (mp4)'), false);
     }
   }
 });

@@ -16,6 +16,7 @@ const BloqueosAgenda = require('./BloqueosAgenda');
 const EventosAgenda = require('./EventosAgenda');
 const Vacunas = require('./Vacunas');
 const CustomFields = require('./CustomFields');
+const LibretaItem = require('./LibretaItem');
 
 // Definir relaciones
 
@@ -64,6 +65,14 @@ Pacientes.belongsToMany(Mascotas, {
 // Mascotas - Vacunas (1:N)
 Mascotas.hasMany(Vacunas, { foreignKey: 'mascotaID', as: 'vacunas' });
 Vacunas.belongsTo(Mascotas, { foreignKey: 'mascotaID', as: 'mascota' });
+
+// Mascotas - Consultas (1:N)
+Mascotas.hasMany(Consultas, { foreignKey: 'mascotaID', as: 'consultas' });
+Consultas.belongsTo(Mascotas, { foreignKey: 'mascotaID', as: 'mascota' });
+
+// Mascotas - LibretaItems (1:N)
+Mascotas.hasMany(LibretaItem, { foreignKey: 'mascotaID', as: 'libretaItems' });
+LibretaItem.belongsTo(Mascotas, { foreignKey: 'mascotaID', as: 'mascota' });
 
 // Mascotas - Turnos, Fichas, Files
 Mascotas.hasMany(Turnos, { foreignKey: 'mascotaID', as: 'turnos' });
@@ -114,5 +123,6 @@ module.exports = {
   BloqueosAgenda,
   EventosAgenda,
   Vacunas,
-  CustomFields
+  CustomFields,
+  LibretaItem
 };

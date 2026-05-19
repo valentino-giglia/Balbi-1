@@ -72,6 +72,7 @@ module.exports = async (app) => {
     const mascotasRoutes = require('./mascotas');
     const vacunasRoutes = require('./vacunas');
     const customFieldsRoutes = require('./custom-fields');
+    const libretaRoutes = require('./libreta');
 
     // Middleware para proteger endpoints salvo los públicos
     // Solo aplicar a rutas que empiecen con /api
@@ -141,6 +142,7 @@ module.exports = async (app) => {
     app.use('/api/mascotas', mascotasRoutes);
     app.use('/api/vacunas', vacunasRoutes);
     app.use('/api/custom-fields', customFieldsRoutes);
+    app.use('/api/libreta', libretaRoutes);
     app.use('/api/v1', apiV1Routes);
 
     console.log('✅ Todas las rutas registradas correctamente');

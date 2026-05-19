@@ -35,6 +35,15 @@ const Consultas = sequelize.define('Consultas', {
   pesoKg: {
     type: DataTypes.DECIMAL(6, 2),
     allowNull: true
+  },
+  mascotaID: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    references: { model: 'mascotas', key: 'id' }
+  },
+  vet: {
+    type: DataTypes.STRING(150),
+    allowNull: true
   }
 }, {
   tableName: 'consultas',

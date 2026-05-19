@@ -7,6 +7,7 @@ function tipoArchivoFromMimetype(mimetype) {
   if (!mimetype) return null;
   if (/^image\//i.test(mimetype)) return 'IMAGEN';
   if (mimetype === 'application/pdf') return 'DOCUMENTO';
+  if (/^video\//i.test(mimetype)) return 'VIDEO';
   return null;
 }
 

@@ -1,4 +1,4 @@
-const { Usuario } = require('../models');
+const { Usuario, Rol } = require('../models');
 const jwt = require('jsonwebtoken');
 require('dotenv').config();
 
@@ -48,7 +48,10 @@ const login = async (req, res) => {
       return res.status(400).json({ error: 'Email y contraseña son requeridos' });
     }
 
-    const usuario = await Usuario.findOne({ where: { email } });
+    const usuario = await Usuario.findOne({
+      where: { email },
+      include: [{ model: Rol, as: 'roles', through: { attributes: [] } }]
+    });
     if (!usuario) {
       return res.status(401).json({ error: 'Credenciales inválidas' });
     }
@@ -62,20 +65,24 @@ const login = async (req, res) => {
       return res.status(401).json({ error: 'Credenciales inválidas' });
     }
 
-    const payload = { 
+    const rolNombre = (usuario.roles && usuario.roles[0]?.nombre?.toLowerCase()) || 'admin';
+
+    const payload = {
       sub: usuario.id,
       email: usuario.email,
-      nombre: usuario.nombre
+      nombre: usuario.nombre,
+      rol: rolNombre
     };
     const token = jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRATION });
 
-    res.json({ 
-      token, 
+    res.json({
+      token,
       expiresIn: JWT_EXPIRATION,
       usuario: {
         id: usuario.id,
         nombre: usuario.nombre,
-        email: usuario.email
+        email: usuario.email,
+        rol: rolNombre
       }
     });
   } catch (error) {

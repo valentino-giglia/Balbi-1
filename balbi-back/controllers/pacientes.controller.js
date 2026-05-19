@@ -67,7 +67,7 @@ function normalizarStr(v) {
 
 const crearPaciente = async (req, res) => {
   try {
-    const { nombre, telefono, email, dni, kapso_phone_number_id, kapso_conversation_id, kapso_agent_status } = req.body;
+    const { nombre, telefono, email, dni, domicilio, kapso_phone_number_id, kapso_conversation_id, kapso_agent_status } = req.body;
 
     const nombreTrim = normalizarStr(nombre);
     if (!nombreTrim) {
@@ -77,6 +77,7 @@ const crearPaciente = async (req, res) => {
     const dniNorm = normalizarStr(dni);
     const telefonoNorm = normalizarStr(telefono);
     const emailNorm = normalizarStr(email);
+    const domicilioNorm = normalizarStr(domicilio);
 
     if (dniNorm) {
       const pacienteExistente = await Pacientes.findOne({ where: { dni: dniNorm } });
@@ -90,6 +91,7 @@ const crearPaciente = async (req, res) => {
       telefono: telefonoNorm,
       email: emailNorm,
       dni: dniNorm,
+      domicilio: domicilioNorm,
       kapso_phone_number_id,
       kapso_conversation_id,
       kapso_agent_status: kapso_agent_status || 'OFF',
@@ -109,7 +111,7 @@ const crearPaciente = async (req, res) => {
 const actualizarPaciente = async (req, res) => {
   try {
     const { id } = req.params;
-    const { nombre, telefono, email, dni, kapso_phone_number_id, kapso_conversation_id, kapso_agent_status, estado, sn_derivado } = req.body;
+    const { nombre, telefono, email, dni, domicilio, kapso_phone_number_id, kapso_conversation_id, kapso_agent_status, estado, sn_derivado } = req.body;
 
     const paciente = await Pacientes.findByPk(id);
     if (!paciente) {
@@ -137,6 +139,7 @@ const actualizarPaciente = async (req, res) => {
     if (telefono !== undefined) updateData.telefono = normalizarStr(telefono);
     if (email !== undefined) updateData.email = normalizarStr(email);
     if (dniNorm !== undefined) updateData.dni = dniNorm;
+    if (domicilio !== undefined) updateData.domicilio = normalizarStr(domicilio);
     if (kapso_phone_number_id !== undefined) updateData.kapso_phone_number_id = kapso_phone_number_id;
     if (kapso_conversation_id !== undefined) updateData.kapso_conversation_id = kapso_conversation_id;
     if (kapso_agent_status !== undefined) updateData.kapso_agent_status = kapso_agent_status;

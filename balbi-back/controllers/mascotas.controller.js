@@ -88,7 +88,7 @@ const obtener = async (req, res) => {
 
 const crear = async (req, res) => {
   try {
-    const { pacienteID, nombre, especie, raza, fechaNacimiento, notas, estado } = req.body;
+    const { pacienteID, nombre, especie, raza, sexo, fechaNacimiento, peso, color, chip, alergias, notas, estado } = req.body;
     if (!pacienteID || !nombre) {
       return res.status(400).json({ error: 'pacienteID y nombre son requeridos' });
     }
@@ -101,7 +101,12 @@ const crear = async (req, res) => {
       nombre,
       especie: especie || null,
       raza: raza || null,
+      sexo: sexo || null,
       fechaNacimiento: fechaNacimiento || null,
+      peso: peso != null && peso !== '' ? +peso : null,
+      color: color || null,
+      chip: chip || null,
+      alergias: alergias || null,
       notas: notas || null,
       estado: estado || 'ACTIVO'
     });
@@ -118,7 +123,7 @@ const crear = async (req, res) => {
 const actualizar = async (req, res) => {
   try {
     const { id } = req.params;
-    const { pacienteID, nombre, especie, raza, fechaNacimiento, notas, estado } = req.body;
+    const { pacienteID, nombre, especie, raza, sexo, fechaNacimiento, peso, color, chip, alergias, notas, estado, fechaFallecimiento, causaFallecimiento } = req.body;
     const mascota = await Mascotas.findByPk(id);
     if (!mascota) {
       return res.status(404).json({ error: 'Mascota no encontrada' });
@@ -133,9 +138,16 @@ const actualizar = async (req, res) => {
     if (nombre !== undefined) updateData.nombre = nombre;
     if (especie !== undefined) updateData.especie = especie;
     if (raza !== undefined) updateData.raza = raza;
+    if (sexo !== undefined) updateData.sexo = sexo;
     if (fechaNacimiento !== undefined) updateData.fechaNacimiento = fechaNacimiento;
+    if (peso !== undefined) updateData.peso = peso != null && peso !== '' ? +peso : null;
+    if (color !== undefined) updateData.color = color;
+    if (chip !== undefined) updateData.chip = chip;
+    if (alergias !== undefined) updateData.alergias = alergias;
     if (notas !== undefined) updateData.notas = notas;
     if (estado !== undefined) updateData.estado = estado;
+    if (fechaFallecimiento !== undefined) updateData.fechaFallecimiento = fechaFallecimiento || null;
+    if (causaFallecimiento !== undefined) updateData.causaFallecimiento = causaFallecimiento || null;
     await mascota.update(updateData);
     if (pacienteID !== undefined && pacienteID != null && pacienteID !== titularAnterior) {
       await MascotaPaciente.destroy({

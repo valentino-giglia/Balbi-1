@@ -47,6 +47,10 @@ const Pacientes = sequelize.define('Pacientes', {
     type: DataTypes.ENUM('ON', 'OFF'),
     defaultValue: 'ON'
   },
+  domicilio: {
+    type: DataTypes.STRING(255),
+    allowNull: true
+  },
   estado: {
     type: DataTypes.ENUM('ACTIVO', 'INACTIVO', 'BAJA'),
     defaultValue: 'ACTIVO'

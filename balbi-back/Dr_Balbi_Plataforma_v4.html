@@ -54,18 +54,23 @@ const BALBI = {
 // API CONFIG — apunta al backend de balbi-back
 // ============================================================
 const API_BASE = 'http://localhost:3000/api';
+window.API_BASE = API_BASE;
 
 // Gestión de token JWT
 const Auth = {
   getToken: () => localStorage.getItem('balbi_token'),
   setToken: (t) => localStorage.setItem('balbi_token', t),
-  clear: () => localStorage.removeItem('balbi_token'),
+  getUser: () => { try { return JSON.parse(localStorage.getItem('balbi_user') || '{}'); } catch { return {}; } },
+  setUser: (u) => localStorage.setItem('balbi_user', JSON.stringify(u)),
+  getRole: () => { try { return JSON.parse(localStorage.getItem('balbi_user') || '{}').rol || 'admin'; } catch { return 'admin'; } },
+  clear: () => { localStorage.removeItem('balbi_token'); localStorage.removeItem('balbi_user'); },
   headers: () => ({ 'Content-Type': 'application/json', 'Authorization': `Bearer ${Auth.getToken()}` }),
   async login(email, contrasena) {
     const r = await fetch(`${API_BASE}/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, contrasena }) });
     if (!r.ok) throw new Error('Credenciales inválidas');
     const data = await r.json();
     Auth.setToken(data.token);
+    if (data.usuario) Auth.setUser(data.usuario);
     return data;
   },
   async get(path) {
@@ -158,6 +163,11 @@ window._apiData = {
 
 // Función que carga todos los datos de la API
 async function loadApiData() {
+  // Siempre limpiar primero para evitar datos mock residuales
+  window._apiData.clients = []; window.CLIENTS = [];
+  window._apiData.pets = [];    window.PETS = [];
+  window._apiData.turnos = [];  window.TURNOS_HOY = [];
+  window._apiData.consultas = []; window.CONSULTAS = [];
   try {
     const [pacRes, masRes, turRes, conRes] = await Promise.allSettled([
       Auth.get('/pacientes'),
@@ -194,6 +204,7 @@ async function loadApiData() {
 
 window.Auth = Auth;
 window.loadApiData = loadApiData;
+window.LOGO_SRC = "data:image/jpeg;base64,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AAAAAAAAAAAAAAAAAAAAAAAAAAAAH//aAAwDAQACAAMAAAAhAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQ+2YkUAA84wgsEP++1tAAl9AAUiAAQH++pqFpAAAACVAAQYg8AAAgV+yyO/AEzvLAADAAApyyV1fpAnM+CGMOAQQ8AAAcVvDCcZAAlh0AADAAABDCXcXpApCCCCC8AAAoww0YV/wA88owD4l+wAAwAAH889ol6QF8GQgcKgEOPAALKFfgAAfzDMYFYgAwAAFQAAL1qQAAAAlSAALIPAAEKFeT/AOw3g7PN5ABr/wDGJ/8A3WNKQAAFvekMKIAKAAAFNPffSwJaQAB6kvffZLvfT4QagAAEOBOJLBHPIABPNHDEABJNDCMGDDBGBCLJCCADAAAFEEADOEBOPAPPCGPLHAMMAKBBNFEFDHKAOBHLAAAAAAIIEIIEEIEAAIAAIAMAEEEEAAEAMEEAMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP/aAAwDAQACAAMAAAAQ8888888888888888888888888888888888888888888888888888888888888888888888888888888888Wy4U8Uw880884gByykv88v8886g888ryylgF4888B+U88ss8o8888yO++o58PUcO8pU888A++z4fA809/+X9t88oo8884mB18QM8ZBr98pU888s18C3XA88+++++V88s8MMckWAMMzl8kNA98pU888iMM/nXA8kC0+ICB8sUo88ocWS88CBB/AR3opU888+88R0cA888B+U088o8o8880WwD+2JZJ//Pxp6++cn2+feEA888ZwlYwU88c888IAwwwBs7i88LWcwwwEjwwz4XH888Q4cgMswQwsUgoAk0gAsY8UIwMkAooQYoU0A4U888UccgQA8IYUMM4wUoYg8os8o4sMIogAEoYEMAk888c8cscc88c88scsc8cM8s88s8s88s88sMM88cM888888888888888888888888888888888888888888888888888888888888888888888888888888888/8QAMBEA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";
 
 // ============================================================
 // Mock data — se usa como fallback si la API no responde
@@ -214,65 +225,23 @@ const PETS_MOCK = [
   { id: 5, name: 'Toto', species: 'Canino', breed: 'Caniche toy', sex: 'M', birth: '2021-07-19', weight: 4.8, ownerId: 4, status: 'activo', color: 'Blanco', chip: '982000368771221', alergias: 'Ninguna' },
 ];
 
-const CLIENTS = CLIENTS_MOCK;
-const PETS = PETS_MOCK;
+const CLIENTS = [];
+const PETS = [];
 
 // Pacientes fallecidos - separados del listado activo
-const FALLECIDOS = [
-  { id: 101, name: 'Toby', species: 'Canino', breed: 'Pastor Alemán', sex: 'M', birth: '2010-04-12', deathDate: '2024-11-23', cause: 'Insuficiencia renal crónica', ownerId: 1, weight: 34.0, lastVet: 'Dr. Balbi' },
-  { id: 102, name: 'Mía', species: 'Felino', breed: 'Persa', sex: 'H', birth: '2008-09-07', deathDate: '2025-03-15', cause: 'Linfoma', ownerId: 3, weight: 4.1, lastVet: 'Dr. Balbi' },
-  { id: 103, name: 'Toby II', species: 'Canino', breed: 'Mestizo', sex: 'M', birth: '2014-01-30', deathDate: '2025-08-04', cause: 'Cardiomiopatía dilatada', ownerId: 6, weight: 22.5, lastVet: 'Dra. Méndez' },
-  { id: 104, name: 'Pepa', species: 'Canino', breed: 'Beagle', sex: 'H', birth: '2012-06-18', deathDate: '2026-01-20', cause: 'Eutanasia humanitaria — neoplasia mamaria', ownerId: 7, weight: 13.8, lastVet: 'Dr. Balbi' },
-  { id: 105, name: 'Sasha', species: 'Felino', breed: 'Mestizo', sex: 'H', birth: '2011-02-14', deathDate: '2025-06-09', cause: 'Edad avanzada', ownerId: 5, weight: 3.4, lastVet: 'Dr. Balbi' },
-];
+const FALLECIDOS = [];
 
-const CONSULTAS = [
-  { id: 1, petId: 1, date: '2026-05-04', time: '10:30', vet: 'Dr. Balbi', motivo: 'Control anual', anamnesis: 'Paciente sano, dieta balanceada, vacunas al día. Dueña refiere actividad física normal.', diagnostico: 'Sano. Sobrepeso leve.', tratamiento: 'Reducir 15% ración diaria. Control en 60 días.', peso: 28.5, temp: 38.4, fc: 88 },
-  { id: 2, petId: 1, date: '2026-02-12', time: '17:15', vet: 'Dr. Balbi', motivo: 'Vacuna séxtuple', anamnesis: 'Refuerzo anual. Sin síntomas.', diagnostico: 'Apta para vacunación.', tratamiento: 'Aplicada Nobivac DHPPi+L. Próximo refuerzo en 12 meses.', peso: 28.0, temp: 38.3, fc: 92 },
-  { id: 3, petId: 1, date: '2025-11-08', time: '09:45', vet: 'Dra. Méndez', motivo: 'Otitis recurrente', anamnesis: 'Sacudidas de cabeza y prurito en oído derecho hace 4 días.', diagnostico: 'Otitis externa eritemato-ceruminosa.', tratamiento: 'Limpieza con ceruminolítico + Otomax 1 gota cada 12hs por 7 días.', peso: 27.8, temp: 38.7, fc: 95 },
-  { id: 4, petId: 1, date: '2025-07-20', time: '11:00', vet: 'Dr. Balbi', motivo: 'Castración', anamnesis: 'OSH programada. Ayuno de 12hs cumplido.', diagnostico: 'Cirugía sin complicaciones.', tratamiento: 'Meloxicam 0.1mg/kg SID 5 días. Cefalexina 22mg/kg BID 7 días. Retiro de puntos en 10 días.', peso: 26.4, temp: 38.2, fc: 90 },
-];
+const CONSULTAS = [];
 
-const TURNOS_HOY = [
-  { id: 1, time: '09:00', duration: 30, petId: 4, motivo: 'Vacunación', vet: 'Dr. Balbi', status: 'confirmado', color: BALBI.primary },
-  { id: 2, time: '09:30', duration: 30, petId: 7, motivo: 'Control post-quirúrgico', vet: 'Dra. Méndez', status: 'confirmado', color: '#1F8A5B' },
-  { id: 3, time: '10:30', duration: 60, petId: 1, motivo: 'Control anual', vet: 'Dr. Balbi', status: 'en-curso', color: BALBI.primary },
-  { id: 4, time: '12:00', duration: 30, petId: 6, motivo: 'Desparasitación', vet: 'Dr. Balbi', status: 'pendiente', color: BALBI.primary },
-  { id: 5, time: '14:00', duration: 45, petId: 11, motivo: 'Limpieza dental', vet: 'Dra. Méndez', status: 'pendiente', color: '#1F8A5B' },
-  { id: 6, time: '15:30', duration: 30, petId: 10, motivo: 'Consulta dermatológica', vet: 'Dr. Balbi', status: 'pendiente', color: BALBI.primary },
-  { id: 7, time: '17:00', duration: 30, petId: 12, motivo: 'Primera consulta cachorro', vet: 'Dr. Balbi', status: 'pendiente', color: BALBI.primary },
-];
+const TURNOS_HOY = [];
 
-const VACUNAS = [
-  { id: 1, petId: 1, nombre: 'Séxtuple (DHPPi+L)', fecha: '2026-02-12', proxima: '2027-02-12', lote: 'NB-44217', status: 'vigente' },
-  { id: 2, petId: 1, nombre: 'Antirrábica', fecha: '2025-08-03', proxima: '2026-08-03', lote: 'AR-22815', status: 'vigente' },
-  { id: 3, petId: 1, nombre: 'Tos de las perreras', fecha: '2025-08-03', proxima: '2026-08-03', lote: 'KC-19922', status: 'proxima' },
-];
+const VACUNAS = [];
 
-const ANTIPARASITARIOS = [
-  { id: 1, petId: 1, nombre: 'NexGard Spectra', fecha: '2026-04-15', proxima: '2026-05-15', tipo: 'Externo + Interno', status: 'vigente' },
-  { id: 2, petId: 1, nombre: 'Drontal Plus', fecha: '2026-01-10', proxima: '2026-04-10', tipo: 'Interno', status: 'vencido' },
-];
+const ANTIPARASITARIOS = [];
 
-const MENSAJES = [
-  { id: 1, clientId: 1, lastMsg: 'Perfecto, gracias doctor!', time: '10:42', unread: 0, channel: 'whatsapp', online: true },
-  { id: 2, clientId: 2, lastMsg: '¿Cómo está Rocco hoy?', time: '10:15', unread: 2, channel: 'whatsapp', online: true },
-  { id: 3, clientId: 3, lastMsg: 'Recordatorio: Luna tiene turno mañana', time: 'Ayer', unread: 0, channel: 'sistema', online: false },
-  { id: 4, clientId: 5, lastMsg: 'Le mando la foto del oído de Felipe', time: 'Ayer', unread: 1, channel: 'whatsapp', online: false },
-  { id: 6, clientId: 6, lastMsg: 'Bruno comió bien esta mañana', time: '08:30', unread: 0, channel: 'whatsapp', online: true },
-  { id: 7, clientId: 7, lastMsg: 'Gracias por la atención!', time: 'Lun', unread: 0, channel: 'whatsapp', online: false },
-];
+const MENSAJES = [];
 
-const CHAT_CARLOS = [
-  { from: 'client', text: 'Buen día doctor', time: '09:50' },
-  { from: 'me', text: 'Buen día Carlos! ¿Cómo amaneció Rocco?', time: '09:52' },
-  { from: 'client', text: 'Comió un poco más que ayer pero todavía está medio decaído', time: '09:55' },
-  { from: 'client', text: 'Le adjunto una foto de cómo está la herida', time: '09:55' },
-  { from: 'client', img: true, time: '09:56' },
-  { from: 'me', text: 'Perfecto, la herida está cicatrizando muy bien. Mantenele la curación 2 veces al día y seguimos con el meloxicam', time: '10:10' },
-  { from: 'client', text: '¿Cómo está Rocco hoy?', time: '10:15' },
-  { from: 'client', text: '¿Lo puedo pasar a buscar mañana a la tarde?', time: '10:15' },
-];
+const CHAT_CARLOS = [];
 
 window.BALBI = BALBI;
 window.CLIENTS = CLIENTS;
@@ -286,42 +255,11 @@ window.CHAT_CARLOS = CHAT_CARLOS;
 window.FALLECIDOS = FALLECIDOS;
 
 // Productos / precios — para módulo Precios + Sheets sync
-const PRODUCTOS_INIT = [
-  { id: 1, categoria: 'Vacunas', nombre: 'Séxtuple Nobivac DHPPi+L', costo: 4200, venta: 7500, stock: 24, unidad: 'dosis', proveedor: 'Holliday-Scott' },
-  { id: 2, categoria: 'Vacunas', nombre: 'Antirrábica', costo: 1800, venta: 3500, stock: 40, unidad: 'dosis', proveedor: 'Biogénesis Bagó' },
-  { id: 3, categoria: 'Vacunas', nombre: 'Triple felina', costo: 3100, venta: 5500, stock: 18, unidad: 'dosis', proveedor: 'Holliday-Scott' },
-  { id: 4, categoria: 'Antiparasitarios', nombre: 'NexGard Spectra L (15-30kg)', costo: 8500, venta: 14000, stock: 12, unidad: 'comp.', proveedor: 'Boehringer' },
-  { id: 5, categoria: 'Antiparasitarios', nombre: 'Drontal Plus', costo: 1100, venta: 2200, stock: 60, unidad: 'comp.', proveedor: 'Bayer' },
-  { id: 6, categoria: 'Antiparasitarios', nombre: 'Bravecto Perros 20-40kg', costo: 9800, venta: 16500, stock: 8, unidad: 'comp.', proveedor: 'MSD' },
-  { id: 7, categoria: 'Medicación', nombre: 'Meloxicam 1.5mg/ml — frasco 10ml', costo: 2400, venta: 4800, stock: 14, unidad: 'frasco', proveedor: 'Brouwer' },
-  { id: 8, categoria: 'Medicación', nombre: 'Cefalexina 500mg x 30 comp.', costo: 3200, venta: 5800, stock: 22, unidad: 'caja', proveedor: 'John Martin' },
-  { id: 9, categoria: 'Medicación', nombre: 'Metronidazol 250mg x 20 comp.', costo: 1800, venta: 3500, stock: 16, unidad: 'caja', proveedor: 'Brouwer' },
-  { id: 10, categoria: 'Servicios', nombre: 'Consulta general', costo: 0, venta: 12000, stock: null, unidad: 'sesión', proveedor: '—' },
-  { id: 11, categoria: 'Servicios', nombre: 'Internación día completo', costo: 4500, venta: 22000, stock: null, unidad: 'día', proveedor: '—' },
-  { id: 12, categoria: 'Servicios', nombre: 'Castración hembra (OSH) canino', costo: 18000, venta: 65000, stock: null, unidad: 'cirugía', proveedor: '—' },
-  { id: 13, categoria: 'Servicios', nombre: 'Limpieza dental con anestesia', costo: 8500, venta: 35000, stock: null, unidad: 'sesión', proveedor: '—' },
-  { id: 14, categoria: 'Estudios', nombre: 'Hemograma completo', costo: 1800, venta: 6500, stock: null, unidad: 'estudio', proveedor: 'Lab. interno' },
-  { id: 15, categoria: 'Estudios', nombre: 'Perfil hepático', costo: 2200, venta: 7800, stock: null, unidad: 'estudio', proveedor: 'Lab. interno' },
-  { id: 16, categoria: 'Estudios', nombre: 'Ecografía abdominal', costo: 1500, venta: 14500, stock: null, unidad: 'estudio', proveedor: '—' },
-  { id: 17, categoria: 'Estudios', nombre: 'Rx torácica', costo: 800, venta: 9500, stock: null, unidad: 'estudio', proveedor: '—' },
-  { id: 18, categoria: 'Alimento', nombre: 'Royal Canin Maxi Adult 15kg', costo: 28500, venta: 42000, stock: 6, unidad: 'bolsa', proveedor: 'Royal Canin' },
-  { id: 19, categoria: 'Alimento', nombre: 'Royal Canin Renal canino 2kg', costo: 12800, venta: 22000, stock: 9, unidad: 'bolsa', proveedor: 'Royal Canin' },
-  { id: 20, categoria: 'Alimento', nombre: 'Hills Prescription Diet i/d 1.5kg', costo: 11400, venta: 19500, stock: 7, unidad: 'bolsa', proveedor: 'Hills' },
-];
+const PRODUCTOS_INIT = [];
 window.PRODUCTOS_INIT = PRODUCTOS_INIT;
 
 // Tipos de internación / box
-const BOXES_INIT = [
-  { id: 1, petId: 3, ingreso: '2026-05-06 14:20', motivo: 'Post-quirúrgico ortopedia', estado: 'estable', dieta: 'Blanda fraccionada x 4', plan: 'Meloxicam 0.1mg/kg SID + Cefalexina 22mg/kg BID', responsable: 'Dr. Balbi', controles: [
-    { hora: '08:00', t: 38.5, fc: 92, fr: 22, obs: 'Buen apetito. Curación sin secreción.', autor: 'Dr. Balbi' },
-    { hora: '12:00', t: 38.6, fc: 95, fr: 24, obs: 'Tomó agua. Decaído leve.', autor: 'Aux. Sosa' },
-    { hora: '16:00', t: 38.7, fc: 90, fr: 22, obs: 'Comió 50% de la ración.', autor: 'Dra. Méndez' },
-  ]},
-  { id: 2, petId: 9, ingreso: '2026-05-07 09:40', motivo: 'Gastroenteritis aguda', estado: 'cuidado', dieta: 'Ayuno 12hs + suero', plan: 'Metoclopramida 0.3mg/kg TID + Ringer Lactato 50ml/kg/día', responsable: 'Dra. Méndez', controles: [
-    { hora: '10:00', t: 39.2, fc: 110, fr: 28, obs: 'Vómito biliar 1 episodio. Mucosas rosadas.', autor: 'Dra. Méndez' },
-    { hora: '13:00', t: 38.9, fc: 102, fr: 26, obs: 'Sin nuevos vómitos. Heces blandas.', autor: 'Aux. Sosa' },
-  ]},
-];
+const BOXES_INIT = [];
 window.BOXES_INIT = BOXES_INIT;
 
 </script>
@@ -329,49 +267,31 @@ window.BOXES_INIT = BOXES_INIT;
 
 <script type="text/babel">
 // Guardia 24hs — datos editables (médicos veterinarios, turnos, alertas)
-const VETS_INIT = [
-  { id: 1, name: 'Dr. Pablo Balbi', role: 'Director médico', color: '#A3007B', initials: 'PB', phone: '341 555-0001' },
-  { id: 2, name: 'Dra. Carolina Méndez', role: 'Cirugía & emergencias', color: '#7A3FBF', initials: 'CM', phone: '341 555-0002' },
-  { id: 3, name: 'Dr. Martín Sosa', role: 'Clínica general', color: '#1F8A5B', initials: 'MS', phone: '341 555-0003' },
-  { id: 4, name: 'Dra. Laura Ibáñez', role: 'Felinos & exóticos', color: '#D97706', initials: 'LI', phone: '341 555-0004' },
-];
+const VETS_INIT = [];
 
 // Turnos de guardia: 4 turnos rotativos diarios
-const GUARDIAS_INIT = [
-  { id: 1, vetId: 2, fecha: '2026-05-09', desde: '22:00', hasta: '06:00', tipo: 'Guardia nocturna', activa: true },
-  { id: 2, vetId: 1, fecha: '2026-05-09', desde: '06:00', hasta: '14:00', tipo: 'Guardia matutina', activa: false },
-  { id: 3, vetId: 3, fecha: '2026-05-09', desde: '14:00', hasta: '22:00', tipo: 'Guardia tarde', activa: false },
-  { id: 4, vetId: 4, fecha: '2026-05-10', desde: '06:00', hasta: '14:00', tipo: 'Guardia matutina', activa: false },
-  { id: 5, vetId: 2, fecha: '2026-05-10', desde: '14:00', hasta: '22:00', tipo: 'Guardia tarde', activa: false },
-];
+const GUARDIAS_INIT = [];
 
 // Alertas operativas (solo aparecen si hay; editables)
-const ALERTAS_INIT = [
-  { id: 1, tipo: 'medicacion', petName: 'Rocco', msg: 'Próxima dosis de Tramadol', detalle: 'Box 1 · 10 mg/kg IV', minutos: 15, severity: 'critico' },
-  { id: 2, tipo: 'estado', petName: 'Bruno', msg: 'En estado crítico desde las 02:30', detalle: 'Box 2 · gastroenteritis aguda', minutos: 72, severity: 'critico' },
-  { id: 3, tipo: 'ambulancia', petName: 'Maxi (Golden 8a)', msg: 'Ambulancia despachada · ETA 8 min', detalle: 'Posible torsión gástrica · Av. Pellegrini 1200', minutos: 8, severity: 'urgente' },
-];
+const ALERTAS_INIT = [];
 
 // Cola de atención (triage)
-const COLA_INIT = [
-  { id: 1, petId: null, petName: 'Mota', species: 'Felino', ownerName: 'Sin registrar', motivo: 'Intoxicación — convulsiones', triage: 'rojo', espera: 0, primera: true, llegada: '03:38' },
-  { id: 2, petId: null, petName: 'Pancho', species: 'Canino', ownerName: 'M. Acosta', motivo: 'Vómitos persistentes', triage: 'amarillo', espera: 12, primera: true, llegada: '03:30' },
-  { id: 3, petId: 4, petName: 'Frida', species: 'Canino', ownerName: 'L. Romero', motivo: 'Control post-quirúrgico', triage: 'verde', espera: 22, primera: false, llegada: '03:20' },
-  { id: 4, petId: 7, petName: 'Lulú', species: 'Felino', ownerName: 'A. Vázquez', motivo: 'Sangrado de oreja', triage: 'amarillo', espera: 8, primera: false, llegada: '03:34' },
-];
+const COLA_INIT = [];
 
 // Internados ahora (con próxima medicación)
-const INTERNADOS_LIVE = [
-  { petId: 3, box: 1, estado: 'observacion', vetId: 2, ingreso: '06/05 14:20', motivo: 'Post-quirúrgico ortopedia', proxMed: 'Tramadol IV', proxMin: 15 },
-  { petId: 9, box: 2, estado: 'critico', vetId: 2, ingreso: 'Ayer 23:40', motivo: 'Gastroenteritis aguda', proxMed: 'Metoclopramida', proxMin: 47 },
-  { petId: 1, box: 3, estado: 'estable', vetId: 1, ingreso: '07/05 09:10', motivo: 'Pancreatitis leve', proxMed: 'Ringer Lactato', proxMin: 120 },
-];
+const INTERNADOS_LIVE = [];
 
 window.VETS_INIT = VETS_INIT;
 window.GUARDIAS_INIT = GUARDIAS_INIT;
 window.ALERTAS_INIT = ALERTAS_INIT;
 window.COLA_INIT = COLA_INIT;
 window.INTERNADOS_LIVE = INTERNADOS_LIVE;
+
+// Zona horaria Argentina — Rosario / Buenos Aires (UTC-3, sin horario de verano)
+window.nowAR = function() { return new Date(new Date().getTime() - 3 * 60 * 60 * 1000); };
+window.todayAR = function() { return window.nowAR().toISOString().slice(0, 10); };
+window.timeAR = function() { return window.nowAR().toISOString().slice(11, 16); };
+window.datetimeAR = function() { return window.nowAR().toISOString().slice(0, 16).replace('T', ' '); };
 
 </script>
 
@@ -1196,56 +1116,68 @@ Object.assign(window, {
 <script type="text/babel">
 // Sidebar + Topbar + AppShell
 const NAV = [
-  { id: 'dashboard', label: 'Dashboard', icon: IconHome },
-  { id: 'agenda', label: 'Agenda', icon: IconCalendar },
-  { id: 'clientes', label: 'Clientes', icon: IconUsers },
-  { id: 'pacientes', label: 'Pacientes', icon: IconPaw },
-  { id: 'consultas', label: 'Consultas', icon: IconStethoscope },
-  { id: 'libreta', label: 'Libreta sanitaria', icon: IconBook },
-  { id: 'mensajes', label: 'Mensajes', icon: IconChat, badge: 3 },
-  { id: 'internacion', label: 'Internación', icon: IconBed, badge: 2 },
-  { id: 'precios', label: 'Precios', icon: IconFile },
+  { id: 'dashboard',     label: 'Dashboard',         icon: IconHome,        roles: ['admin','veterinario','recepcion'] },
+  { id: 'agenda',        label: 'Agenda',             icon: IconCalendar,    roles: ['admin','veterinario','recepcion'] },
+  { id: 'clientes',      label: 'Clientes',           icon: IconUsers,       roles: ['admin','recepcion'] },
+  { id: 'pacientes',     label: 'Pacientes',          icon: IconPaw,         roles: ['admin','veterinario'] },
+  { id: 'consultas',     label: 'Consultas',          icon: IconStethoscope, roles: ['admin','veterinario'] },
+  { id: 'libreta',       label: 'Libreta sanitaria',  icon: IconBook,        roles: ['admin','veterinario'] },
+  { id: 'mensajes',      label: 'Mensajes',           icon: IconChat,        roles: ['admin','veterinario','recepcion'] },
+  { id: 'internacion',   label: 'Internación',        icon: IconBed,         roles: ['admin','veterinario'] },
+  { id: 'precios',       label: 'Precios',            icon: IconFile,        roles: ['admin'] },
+  { id: 'configuracion', label: 'Configuración',      icon: IconSettings,    roles: ['admin'] },
 ];
 
-const Sidebar = ({ active, setActive }) => (
+const ROLE_PERMISSIONS = {
+  admin:       ['dashboard','agenda','clientes','pacientes','consultas','libreta','mensajes','internacion','precios','configuracion'],
+  veterinario: ['dashboard','agenda','pacientes','consultas','libreta','mensajes','internacion'],
+  recepcion:   ['dashboard','agenda','clientes','mensajes'],
+};
+const canAccess = (rol, id) => (ROLE_PERMISSIONS[rol] || ROLE_PERMISSIONS.admin).includes(id);
+window.canAccess = canAccess;
+
+const ROL_LABEL = { admin: 'Administrador', veterinario: 'Veterinario', recepcion: 'Recepción' };
+
+const Sidebar = ({ active, setActive, msgBadge = 0, currentUser = {} }) => {
+  const rol = currentUser.rol || window.Auth.getRole();
+  const visible = (n) => canAccess(rol, n.id);
+  return (
   <div style={{
     width: 232, background: '#2B2B2B', color: 'white',
     display: 'flex', flexDirection: 'column', flexShrink: 0,
     borderRight: '1px solid rgba(255,255,255,0.06)',
   }}>
     {/* Logo */}
-    <div style={{ padding: '22px 20px 20px', display: 'flex', alignItems: 'center', gap: 10, borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-      <IconLogo size={28} />
-      <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.05 }}>
-        <span style={{ fontSize: 17, fontWeight: 800, letterSpacing: 0.5 }}>DR<span style={{ color: '#A3007B' }}>BALBI</span></span>
-        <span style={{ fontSize: 9, color: '#888', letterSpacing: 1.4, fontWeight: 600 }}>EMERGENCIAS VETERINARIAS</span>
-      </div>
+    <div style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderBottom: '1px solid rgba(255,255,255,0.06)', background: 'white' }}>
+      <img src={window.LOGO_SRC || ''} alt="Dr. Balbi" style={{ width: 156, height: 'auto', objectFit: 'contain', display: 'block' }} />
     </div>
     {/* Nav */}
-    <div style={{ padding: '14px 10px', flex: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>
+    <div style={{ padding: '14px 10px', flex: 1, display: 'flex', flexDirection: 'column', gap: 2, overflowY: 'auto' }}>
       <div style={{ fontSize: 10, color: '#888', letterSpacing: 1.4, fontWeight: 700, padding: '10px 12px 6px' }}>OPERACIÓN</div>
-      {NAV.slice(0, 2).map(n => <NavItem key={n.id} item={n} active={active === n.id} onClick={() => setActive(n.id)} />)}
+      {NAV.slice(0, 2).filter(visible).map(n => <NavItem key={n.id} item={n} active={active === n.id} onClick={() => setActive(n.id)} dynamicBadge={n.id === 'mensajes' ? msgBadge : null} />)}
       <div style={{ fontSize: 10, color: '#888', letterSpacing: 1.4, fontWeight: 700, padding: '14px 12px 6px' }}>PACIENTES</div>
-      {NAV.slice(2, 6).map(n => <NavItem key={n.id} item={n} active={active === n.id} onClick={() => setActive(n.id)} />)}
+      {NAV.slice(2, 6).filter(visible).map(n => <NavItem key={n.id} item={n} active={active === n.id} onClick={() => setActive(n.id)} dynamicBadge={null} />)}
       <div style={{ fontSize: 10, color: '#888', letterSpacing: 1.4, fontWeight: 700, padding: '14px 12px 6px' }}>COMUNICACIÓN</div>
-      {NAV.slice(6, 8).map(n => <NavItem key={n.id} item={n} active={active === n.id} onClick={() => setActive(n.id)} />)}
+      {NAV.slice(6, 8).filter(visible).map(n => <NavItem key={n.id} item={n} active={active === n.id} onClick={() => setActive(n.id)} dynamicBadge={n.id === 'mensajes' ? msgBadge : null} />)}
       <div style={{ fontSize: 10, color: '#888', letterSpacing: 1.4, fontWeight: 700, padding: '14px 12px 6px' }}>ADMINISTRACIÓN</div>
-      {NAV.slice(8).map(n => <NavItem key={n.id} item={n} active={active === n.id} onClick={() => setActive(n.id)} />)}
+      {NAV.slice(8).filter(visible).map(n => <NavItem key={n.id} item={n} active={active === n.id} onClick={() => setActive(n.id)} dynamicBadge={null} />)}
     </div>
     {/* User */}
     <div style={{ padding: '14px 14px 18px', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: 10 }}>
-      <Avatar name="Pablo Balbi" size={36} color="#A3007B" />
+      <Avatar name={currentUser.nombre || 'Usuario'} size={36} color="#A3007B" />
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 13, fontWeight: 600 }}>Dr. Pablo Balbi</div>
-        <div style={{ fontSize: 11, color: '#999' }}>Director médico</div>
+        <div style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{currentUser.nombre || 'Dr. Pablo Balbi'}</div>
+        <div style={{ fontSize: 11, color: '#999' }}>{ROL_LABEL[rol] || 'Usuario'}</div>
       </div>
-      <button style={{ background: 'transparent', border: 'none', color: '#999', cursor: 'pointer', display: 'flex', padding: 4 }}><IconSettings size={16} /></button>
+      <button onClick={() => window.Auth.clear() || window.location.reload()} title="Cerrar sesión" style={{ background: 'transparent', border: 'none', color: '#999', cursor: 'pointer', display: 'flex', padding: 4 }}><IconSettings size={16} /></button>
     </div>
   </div>
-);
+  );
+};
 
-const NavItem = ({ item, active, onClick }) => {
+const NavItem = ({ item, active, onClick, dynamicBadge }) => {
   const I = item.icon;
+  const badge = dynamicBadge != null ? dynamicBadge : item.badge;
   return (
     <button onClick={onClick} style={{
       width: '100%', display: 'flex', alignItems: 'center', gap: 10,
@@ -1259,7 +1191,7 @@ const NavItem = ({ item, active, onClick }) => {
     onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = 'transparent'; }}>
       <I size={17} />
       <span style={{ flex: 1 }}>{item.label}</span>
-      {item.badge && <span style={{ background: active ? 'rgba(255,255,255,0.25)' : '#A3007B', color: 'white', fontSize: 10, fontWeight: 700, borderRadius: 10, padding: '2px 7px', minWidth: 18, textAlign: 'center' }}>{item.badge}</span>}
+      {!!badge && <span style={{ background: active ? 'rgba(255,255,255,0.25)' : '#A3007B', color: 'white', fontSize: 10, fontWeight: 700, borderRadius: 10, padding: '2px 7px', minWidth: 18, textAlign: 'center' }}>{badge}</span>}
     </button>
   );
 };
@@ -1304,8 +1236,9 @@ window.NAV = NAV;
 const { useState: useStateD, useEffect: useEffectD, useMemo: useMemoD } = React;
 
 const Dashboard = ({ goTo, openSearch }) => {
-  const [vets, setVets] = useStateD(window.VETS_INIT);
-  const [guardias, setGuardias] = useStateD(window.GUARDIAS_INIT);
+  const _savedGuardia = (() => { try { return JSON.parse(localStorage.getItem('balbi_guardia') || '{}'); } catch { return {}; } })();
+  const [vets, setVets] = useStateD(_savedGuardia.vets || window.VETS_INIT);
+  const [guardias, setGuardias] = useStateD(_savedGuardia.guardias || window.GUARDIAS_INIT);
   const [alertas, setAlertas] = useStateD(window.ALERTAS_INIT);
   const [cola, setCola] = useStateD(window.COLA_INIT);
   const [internados, setInternados] = useStateD(window.INTERNADOS_LIVE);
@@ -1316,13 +1249,50 @@ const Dashboard = ({ goTo, openSearch }) => {
   const [editCola, setEditCola] = useStateD(null);
   const [editInt, setEditInt] = useStateD(null);
 
+  // Persistir vets y guardias en localStorage
+  useEffectD(() => { localStorage.setItem('balbi_guardia', JSON.stringify({ vets, guardias })); }, [vets, guardias]);
+
+  useEffectD(() => {
+    if (!window.Auth?.getToken()) return;
+    const today = window.todayAR();
+    window.Auth.get('/turnos?fechaInicio=' + today + 'T00:00:00&fechaFin=' + today + 'T23:59:59').then(res => {
+      const raw = Array.isArray(res) ? res : (res.data || []);
+      const fromApi = raw.map(t => ({
+        id: 'turno-' + t.id, fromTurno: true,
+        petName: t.mascota?.nombre || 'Sin nombre',
+        species: t.mascota?.especie || 'Canino',
+        ownerName: t.paciente?.nombre || 'Sin registrar',
+        motivo: t.servicio?.nombre || t.notas || 'Consulta',
+        triage: 'verde', espera: 0, primera: false,
+        llegada: t.horaInicio ? new Date(new Date(t.horaInicio).getTime() - 3 * 60 * 60 * 1000).toISOString().slice(11, 16) : '00:00',
+      }));
+      setCola(prev => {
+        const manual = prev.filter(c => !c.fromTurno);
+        return [...manual, ...fromApi];
+      });
+    }).catch(() => {});
+  }, []);
+
   const guardiaActiva = guardias.find(g => g.activa) || guardias[0];
   const vetActivo = vets.find(v => v.id === guardiaActiva?.vetId);
-  const proxima = guardias.find(g => !g.activa && g.fecha >= guardiaActiva.fecha);
+  const proxima = guardiaActiva ? guardias.find(g => !g.activa && g.fecha >= guardiaActiva.fecha) : undefined;
   const proxVet = vets.find(v => v.id === proxima?.vetId);
 
-  const restante = '2h 18min';
-  const progreso = 72;
+  const [_dashTick, _setDashTick] = useStateD(0);
+  useEffectD(() => { const t = setInterval(() => _setDashTick(n => n + 1), 1000); return () => clearInterval(t); }, []);
+  const { restante, progreso } = (() => {
+    if (!guardiaActiva?.desde || !guardiaActiva?.hasta) return { restante: '--', progreso: 0 };
+    const now = window.nowAR ? window.nowAR() : new Date();
+    const nowMin = now.getUTCHours() * 60 + now.getUTCMinutes();
+    const [dh, dm] = guardiaActiva.desde.split(':').map(Number);
+    const [hh, hm] = guardiaActiva.hasta.split(':').map(Number);
+    const desdeMin = dh * 60 + dm, hastaMin = hh * 60 + hm;
+    const totalMin = hastaMin - desdeMin;
+    const pct = totalMin > 0 ? Math.min(100, Math.max(0, Math.round((nowMin - desdeMin) / totalMin * 100))) : 0;
+    const remMin = Math.max(0, hastaMin - nowMin);
+    const rh = Math.floor(remMin / 60), rm = remMin % 60;
+    return { restante: rh > 0 ? `${rh}h ${rm}min` : `${rm}min`, progreso: pct };
+  })();
 
   const kpis = [
     { label: 'Ingresos últimas 24hs', value: 14, sub: '+3 vs ayer', trend: 'up', color: '#A3007B' },
@@ -1340,7 +1310,7 @@ const Dashboard = ({ goTo, openSearch }) => {
         proxVet={proxVet}
         restante={restante}
         progreso={progreso}
-        onEditGuardia={() => setEditGuardia(guardiaActiva)}
+        onEditGuardia={() => setEditGuardia(guardiaActiva || { id: Date.now(), vetId: vets[0]?.id || 1, tipo: 'Guardia 24hs', fecha: window.todayAR(), desde: '08:00', hasta: '20:00', activa: true })}
         onEditVets={() => setEditVets(true)}
       />
 
@@ -1365,7 +1335,7 @@ const Dashboard = ({ goTo, openSearch }) => {
           vets={vets}
           onAtender={(item) => setCola(cola.filter(c => c.id !== item.id))}
           onEdit={(item) => setEditCola(item)}
-          onAdd={() => setEditCola({ id: null, petName: '', species: 'Canino', ownerName: '', motivo: '', triage: 'amarillo', espera: 0, primera: true, llegada: new Date().toTimeString().slice(0,5) })}
+          onAdd={() => setEditCola({ id: null, petName: '', species: 'Canino', ownerName: '', motivo: '', triage: 'amarillo', espera: 0, primera: true, llegada: window.timeAR() })}
         />
         <InternadosLive
           internados={internados}
@@ -1379,7 +1349,7 @@ const Dashboard = ({ goTo, openSearch }) => {
         📊 Las estadísticas y gráficos analíticos se movieron a <a onClick={() => goTo && goTo('agenda')} style={{ color: '#A3007B', cursor: 'pointer', fontWeight: 600 }}>Análisis</a> · Esta vista es operativa en tiempo real
       </div>
 
-      {editGuardia && <GuardiaModal guardia={editGuardia} vets={vets} onClose={() => setEditGuardia(null)} onSave={(g) => { setGuardias(guardias.map(x => x.id === g.id ? g : x)); setEditGuardia(null); }} />}
+      {editGuardia && <GuardiaModal guardia={editGuardia} vets={vets} onClose={() => setEditGuardia(null)} onSave={(g) => { if (guardias.some(x => x.id === g.id)) { setGuardias(guardias.map(x => x.id === g.id ? g : x)); } else { setGuardias([...guardias, { ...g, activa: true }]); } setEditGuardia(null); }} />}
       {editVets && <VetsModal vets={vets} onClose={() => setEditVets(false)} onSave={(vs) => { setVets(vs); setEditVets(false); }} />}
       {editAlerta && <AlertaModal alerta={editAlerta} onClose={() => setEditAlerta(null)} onSave={(a) => { if (a.id) setAlertas(alertas.map(x => x.id === a.id ? a : x)); else setAlertas([...alertas, { ...a, id: Math.max(0, ...alertas.map(x=>x.id))+1 }]); setEditAlerta(null); }} onDelete={(id) => { setAlertas(alertas.filter(x => x.id !== id)); setEditAlerta(null); }} />}
       {editCola && <ColaModal item={editCola} onClose={() => setEditCola(null)} onSave={(it) => { if (it.id) setCola(cola.map(x => x.id === it.id ? it : x)); else setCola([...cola, { ...it, id: Math.max(0, ...cola.map(x=>x.id))+1 }]); setEditCola(null); }} onDelete={(id) => { setCola(cola.filter(x => x.id !== id)); setEditCola(null); }} />}
@@ -1389,7 +1359,32 @@ const Dashboard = ({ goTo, openSearch }) => {
 };
 
 const GuardiaHero = ({ guardia, vet, proxima, proxVet, restante, progreso, onEditGuardia, onEditVets }) => {
-  if (!guardia || !vet) return null;
+  const _isAdmin = window.Auth.getRole() === 'admin';
+  const [_ghTick, _setGhTick] = useStateD(0);
+  useEffectD(() => { const t = setInterval(() => _setGhTick(n => n + 1), 1000); return () => clearInterval(t); }, []);
+  const clockStr = window.nowAR ? window.nowAR().toISOString().slice(11, 19) : '--:--:--';
+  if (!guardia || !vet) {
+    if (!_isAdmin) return null;
+    return (
+      <div style={{ background: 'linear-gradient(120deg, #2B2B2B 0%, #1A1A1A 60%, #3D2A36 100%)', borderRadius: 16, padding: '26px 28px', color: 'white', border: '1px solid rgba(163,0,123,0.3)', display: 'flex', alignItems: 'center', gap: 20, flexShrink: 0 }}>
+        <div style={{ position: 'absolute', right: -20, top: -20, opacity: 0.05 }}><svg width="200" height="200" viewBox="0 0 24 24" fill="#A3007B"><path d="M9 2h6v7h7v6h-7v7H9v-7H2V9h7z" /></svg></div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: 0.8, fontWeight: 700, marginBottom: 8 }}>Centro de guardia</div>
+          <div style={{ fontSize: 16, fontWeight: 700, color: 'rgba(255,255,255,0.85)' }}>Sin guardia configurada</div>
+          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', marginTop: 5 }}>Agregá el equipo médico y asigná los turnos de guardia</div>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flexShrink: 0 }}>
+          <button onClick={onEditGuardia} style={{ height: 40, padding: '0 20px', borderRadius: 10, background: '#A3007B', border: 'none', color: 'white', fontSize: 13.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+            Asignar guardia
+          </button>
+          <button onClick={onEditVets} style={{ height: 36, padding: '0 16px', borderRadius: 10, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.75)', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+            Configurar equipo
+          </button>
+        </div>
+      </div>
+    );
+  }
   const fechaLabel = (() => {
     const d = new Date(guardia.fecha + 'T00:00');
     return d.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' });
@@ -1411,7 +1406,7 @@ const GuardiaHero = ({ guardia, vet, proxima, proxVet, restante, progreso, onEdi
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
             <span style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.55)', textTransform: 'uppercase', letterSpacing: 0.6, fontWeight: 700 }}>Guardia activa</span>
             <span style={{ width: 3, height: 3, borderRadius: '50%', background: 'rgba(255,255,255,0.3)' }} />
-            <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', textTransform: 'capitalize' }}>{fechaLabel} · 03:42</span>
+            <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', textTransform: 'capitalize' }}>{fechaLabel} · <span style={{ fontFamily: 'ui-monospace, monospace', letterSpacing: 0 }}>{clockStr}</span></span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
             <div style={{ width: 56, height: 56, borderRadius: '50%', background: vet.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 18, color: 'white', flexShrink: 0, boxShadow: '0 4px 14px rgba(163,0,123,0.4)' }}>
@@ -1451,11 +1446,14 @@ const GuardiaHero = ({ guardia, vet, proxima, proxVet, restante, progreso, onEdi
               </div>
             </div>
           ) : (
-            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginBottom: 10 }}>Sin guardia siguiente programada</div>
+            <React.Fragment>
+              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginBottom: 10 }}>Sin guardia siguiente programada</div>
+              {_isAdmin && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)' }}>Usá "Equipo de guardia" para agregar la siguiente</div>}
+            </React.Fragment>
           )}
           <div style={{ display: 'flex', gap: 6 }}>
-            <button onClick={onEditGuardia} title="Editar guardia" style={{ flex: '0 0 auto', height: 32, width: 32, borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.75)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><IconEdit size={14} /></button>
-            <button onClick={onEditVets} style={{ flex: 1, height: 32, borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.85)', cursor: 'pointer', fontSize: 12, fontWeight: 600, fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}><IconUsers size={13} /> Equipo de guardia</button>
+            {_isAdmin && <button onClick={onEditGuardia} title="Editar guardia" style={{ flex: '0 0 auto', height: 32, width: 32, borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.75)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><IconEdit size={14} /></button>}
+            {_isAdmin && <button onClick={onEditVets} style={{ flex: 1, height: 32, borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.85)', cursor: 'pointer', fontSize: 12, fontWeight: 600, fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}><IconUsers size={13} /> Equipo de guardia</button>}
           </div>
         </div>
       </div>
@@ -1754,7 +1752,7 @@ const InternadosLive = ({ internados, vets, onEdit, goTo }) => {
       </div>
       <div style={{ display: 'flex', flexDirection: 'column' }}>
         {internados.map((it, i) => {
-          const pet = PETS.find(p => p.id === it.petId);
+          const pet = (window.PETS||[]).find(p => p.id === it.petId);
           const owner = pet ? CLIENTS.find(c => c.id === pet.ownerId) : null;
           const vet = vets.find(v => v.id === it.vetId);
           const urgente = it.proxMin <= 20;
@@ -1975,11 +1973,10 @@ window.Dashboard = Dashboard;
 
 // clientes.jsx
 // Clientes & Pacientes views
-const ClientesView = ({ loading, openClient, openNew }) => {
+const ClientesView = ({ loading, openClient, openNew, refreshTick }) => {
   const [q, setQ] = useState('');
   const [clients, setClients] = useState(window.CLIENTS || []);
 
-  // Refresca la lista desde la API cada vez que se monta
   React.useEffect(() => {
     if (window.Auth?.getToken()) {
       window.Auth.get('/pacientes').then(res => {
@@ -1991,9 +1988,11 @@ const ClientesView = ({ loading, openClient, openNew }) => {
         }));
         window.CLIENTS = mapped;
         setClients(mapped);
-      }).catch(() => setClients(window.CLIENTS || []));
+      }).catch(() => setClients([...(window.CLIENTS || [])]));
+    } else {
+      setClients([...(window.CLIENTS || [])]);
     }
-  }, []);
+  }, [refreshTick]);
 
   const filteredActivos = clients.filter(c =>
     c.name.toLowerCase().includes(q.toLowerCase()) ||
@@ -2058,7 +2057,7 @@ const LIBRETA_CATS_FALL = [
 
 const FallecidoDrawer = ({ fall, open, onClose }) => {
   if (!fall) return null;
-  const owner = CLIENTS.find(c => c.id === fall.ownerId);
+  const owner = (window.CLIENTS||[]).find(c => c.id === fall.ownerId);
   const ageY = parseInt(fall.deathDate) - parseInt(fall.birth);
   return (
     <Drawer open={open} onClose={onClose} title="Paciente fallecido" width={580} footer={
@@ -2135,7 +2134,7 @@ const PacientesView = ({ loading, openPet, openNew }) => {
   const [species, setSpecies] = useState('todos');
   const [tabPac, setTabPac] = useState('activos');
   const [pets, setPets] = useState(window.PETS || []);
-  const [fallecidos, setFallecidos] = useState(window.FALLECIDOS);
+  const [fallecidos, setFallecidos] = useState([]);
   const [confirmDel, setConfirmDel] = useState(null);
   const [openFall, setOpenFall] = useState(null);
   const [editFall, setEditFall] = useState(null);
@@ -2153,6 +2152,21 @@ const PacientesView = ({ loading, openPet, openNew }) => {
         window.PETS = mapped;
         setPets(mapped);
       }).catch(() => setPets(window.PETS || []));
+    }
+  }, []);
+
+  React.useEffect(() => {
+    if (window.Auth?.getToken()) {
+      window.Auth.get('/mascotas?estado=BAJA').then(res => {
+        const raw = Array.isArray(res) ? res : (res.data || []);
+        const mapped = raw.map(m => ({
+          id: m.id, name: m.nombre, species: m.especie || 'Canino', breed: m.raza || '—',
+          birth: m.fechaNacimiento || '', deathDate: m.fechaFallecimiento || '',
+          cause: m.causaFallecimiento || 'Sin especificar', ownerId: m.pacienteID,
+          lastVet: 'Dr. Balbi',
+        }));
+        setFallecidos(mapped);
+      }).catch(() => {});
     }
   }, []);
 
@@ -2237,7 +2251,7 @@ const PacientesView = ({ loading, openPet, openNew }) => {
               <div>Paciente</div><div>Dueño</div><div>Nacimiento</div><div>Fecha fallec.</div><div>Causa</div><div>Últ. profesional</div><div></div>
             </div>
             {filteredFall.map(f => {
-              const owner = CLIENTS.find(c => c.id === f.ownerId);
+              const owner = (window.CLIENTS||[]).find(c => c.id === f.ownerId);
               const ageY = parseInt(f.deathDate) - parseInt(f.birth);
               return (
                 <div key={f.id} onClick={() => setOpenFall(f)} style={{ padding: '14px 18px', borderBottom: '1px solid #F4F0F2', display: 'grid', gridTemplateColumns: '1.4fr 1.2fr 110px 110px 1.4fr 120px 100px', gap: 12, alignItems: 'center', fontSize: 13, cursor: 'pointer', transition: 'background .1s' }}
@@ -2306,7 +2320,7 @@ const PacientesView = ({ loading, openPet, openNew }) => {
         <Modal open={true} onClose={() => setConfirmDel(null)} title="Eliminar registro" width={420}
           footer={<><Btn variant="ghost" onClick={() => setConfirmDel(null)}>Cancelar</Btn><Btn variant="danger" icon={<IconTrash />} onClick={() => removeFall(confirmDel.id)}>Eliminar definitivamente</Btn></>}>
           <div style={{ fontSize: 13.5, color: '#444', lineHeight: 1.6 }}>
-            Vas a eliminar el registro de <strong>{confirmDel.name}</strong> ({CLIENTS.find(c => c.id === confirmDel.ownerId)?.name}). Esta acción no se puede deshacer y se perderá su historia clínica.
+            Vas a eliminar el registro de <strong>{confirmDel.name}</strong> ({(window.CLIENTS||[]).find(c => c.id === confirmDel.ownerId)?.name}). Esta acción no se puede deshacer y se perderá su historia clínica.
           </div>
         </Modal>
       )}
@@ -2429,7 +2443,8 @@ window.PacientesView = PacientesView;
 const { useState: useStateD2 } = React;
 const useState = useStateD2;
 const InternacionView = () => {
-  const [boxes, setBoxes] = useState(window.BOXES_INIT);
+  const [boxes, setBoxes] = useState(() => window._INTERN_BOXES !== undefined ? window._INTERN_BOXES : window.BOXES_INIT);
+  React.useEffect(() => { window._INTERN_BOXES = boxes; }, [boxes]);
   const [editing, setEditing] = useState(null);
   const [newBox, setNewBox] = useState(false);
   const [confirmAlta, setConfirmAlta] = useState(null);
@@ -2459,7 +2474,7 @@ const InternacionView = () => {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14 }}>
         {boxes.map(b => {
           const p = PETS.find(x => x.id === b.petId);
-          const owner = p ? CLIENTS.find(c => c.id === p.ownerId) : null;
+          const owner = p ? (window.CLIENTS||[]).find(c => c.id === p.ownerId) : null;
           const last = b.controles[b.controles.length - 1];
           return (
             <div key={b.id} style={{ background: 'white', border: '1px solid #EFEAEE', borderRadius: 12, padding: 18 }}>
@@ -2535,7 +2550,7 @@ const InternacionView = () => {
         <Modal open={true} onClose={() => setConfirmAlta(null)} title="Dar de alta" width={420}
           footer={<><Btn variant="ghost" onClick={() => setConfirmAlta(null)}>Cancelar</Btn><Btn variant="primary" icon={<IconCheck />} onClick={() => dischargeBox(confirmAlta.id)}>Confirmar alta</Btn></>}>
           <div style={{ fontSize: 13.5, color: '#444', lineHeight: 1.6 }}>
-            ¿Dar de alta a <strong>{PETS.find(p => p.id === confirmAlta.petId)?.name}</strong>? Se cerrará la hoja de evolución y se moverá a la historia clínica.
+            ¿Dar de alta a <strong>{(window.PETS || []).find(p => p.id === confirmAlta.petId)?.name}</strong>? Se cerrará la hoja de evolución y se moverá a la historia clínica.
           </div>
         </Modal>
       )}
@@ -2546,8 +2561,8 @@ const InternacionView = () => {
 const iconBtn2 = { background: 'transparent', border: 'none', color: '#888', cursor: 'pointer', padding: 4, borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' };
 
 const ControlModal = ({ boxId, initial, idx, onClose, onSave }) => {
-  const now = new Date();
-  const [c, setC] = useState(initial || { hora: now.toTimeString().slice(0,5), t: 38.5, fc: 90, fr: 22, obs: '', autor: 'Dr. Balbi' });
+  const now = window.nowAR ? window.nowAR() : new Date();
+  const [c, setC] = useState(initial || { hora: now.toISOString().slice(11, 16), t: 38.5, fc: 90, fr: 22, obs: '', autor: 'Dr. Balbi' });
   return (
     <Modal open={true} onClose={onClose} title={idx != null ? 'Editar control' : 'Registrar control'}
       footer={<><Btn variant="ghost" onClick={onClose}>Cancelar</Btn><Btn variant="primary" icon={<IconCheck />} onClick={() => onSave(c)}>{idx != null ? 'Guardar cambios' : 'Registrar'}</Btn></>}>
@@ -2593,8 +2608,9 @@ const PlanModal = ({ box, onClose, onSave }) => {
 };
 
 const BoxModal = ({ box, onClose, onSave, onDelete, isNew }) => {
-  const now = new Date();
-  const [data, setData] = useState(box || { petId: PETS.filter(p => p.status === 'activo')[0]?.id || 1, ingreso: now.toISOString().slice(0,16).replace('T',' '), motivo: '', estado: 'estable', dieta: '', plan: '', ubicacion: 'Box 1' });
+  const now = window.nowAR ? window.nowAR() : new Date();
+  const activePets = (window.PETS || []).filter(p => p.status === 'activo');
+  const [data, setData] = useState(box || { petId: activePets[0]?.id || 1, ingreso: now.toISOString().slice(0,16).replace('T',' '), motivo: '', estado: 'estable', dieta: '', plan: '', ubicacion: 'Box 1' });
   const [ubicacionCustom, setUbicacionCustom] = useState(false);
   const presets = ['Box 1','Box 2','Box 3','Box 4','Terapia intensiva','Aislamiento','Cirugía — recuperación'];
   return (
@@ -2608,8 +2624,8 @@ const BoxModal = ({ box, onClose, onSave, onDelete, isNew }) => {
         {isNew && (
           <Field label="Paciente">
             <select value={data.petId} onChange={(e) => setData({ ...data, petId: +e.target.value })} style={{ height: 38, padding: '0 12px', borderRadius: 8, border: '1px solid #E0DCE0', fontSize: 14, fontFamily: 'inherit', outline: 'none' }}>
-              {PETS.filter(p => p.status === 'activo').map(p => {
-                const o = CLIENTS.find(c => c.id === p.ownerId);
+              {(window.PETS || []).filter(p => p.status === 'activo').map(p => {
+                const o = (window.CLIENTS || []).find(c => c.id === p.ownerId);
                 return <option key={p.id} value={p.id}>{p.name} — {o?.name}</option>;
               })}
             </select>
@@ -2650,37 +2666,62 @@ const BoxModal = ({ box, onClose, onSave, onDelete, isNew }) => {
   );
 };
 
-const ClientDrawer = ({ client, open, onClose, goToPet, goToMensajes }) => {
+const ClientDrawer = ({ client, open, onClose, goToPet, goToMensajes, onSaved }) => {
   if (!client) return null;
-  const pets = PETS.filter(p => client.pets.includes(p.id));
+  const pets = (window.PETS || []).filter(p => p.ownerId === client.id);
   const [editMode, setEditMode] = React.useState(false);
   const [form, setForm] = React.useState(client);
+  const [saving, setSaving] = React.useState(false);
+  const [saveError, setSaveError] = React.useState('');
   React.useEffect(() => { setForm(client); setEditMode(false); }, [client]);
-  const selStyle2 = { height: 38, padding: '0 12px', borderRadius: 8, border: '1px solid #E0DCE0', fontSize: 14, fontFamily: 'inherit', outline: 'none', width: '100%', background: 'white' };
+
+  const handleSave = async () => {
+    setSaving(true); setSaveError('');
+    // Actualización optimista: reflejar cambios de inmediato
+    window.CLIENTS = (window.CLIENTS || []).map(c => c.id === client.id ? { ...c, ...form } : c);
+    setEditMode(false);
+    if (onSaved) onSaved();
+    // Intentar sincronizar con el servidor si hay token
+    if (window.Auth?.getToken()) {
+      try {
+        await window.Auth.put(`/pacientes/${client.id}`, {
+          nombre: form.name,
+          dni: form.dni === '—' ? '' : form.dni,
+          telefono: form.phone === '—' ? '' : form.phone,
+          email: form.email === '—' ? '' : form.email,
+          domicilio: form.address === '—' ? '' : form.address,
+        });
+      } catch (e) {
+        setSaveError('Sin conexión con el servidor. Cambios guardados localmente.');
+      }
+    }
+    setSaving(false);
+  };
+
   return (
     <Drawer open={open} onClose={onClose} title={editMode ? "Editar cliente" : "Ficha del cliente"} footer={
       <>
         <Btn variant="ghost" onClick={() => { if (editMode) setEditMode(false); else onClose(); }}>{editMode ? 'Cancelar' : 'Cerrar'}</Btn>
         {!editMode && <Btn variant="secondary" icon={<IconEdit />} onClick={() => setEditMode(true)}>Editar</Btn>}
-        {editMode && <Btn variant="primary" icon={<IconCheck />} onClick={() => setEditMode(false)}>Guardar cambios</Btn>}
+        {editMode && <Btn variant="primary" icon={<IconCheck />} onClick={handleSave} disabled={saving}>{saving ? 'Guardando…' : 'Guardar cambios'}</Btn>}
         {!editMode && <Btn variant="primary" icon={<IconChat />} onClick={() => { onClose(); goToMensajes && goToMensajes(client); }}>Mensaje</Btn>}
       </>
     }>
       {!editMode ? (
         <>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-            <Avatar name={client.name} size={56} />
+            <Avatar name={form.name} size={56} />
             <div>
-              <div style={{ fontSize: 18, fontWeight: 700 }}>{client.name}</div>
-              <div style={{ fontSize: 12, color: '#888' }}>DNI {client.dni}</div>
-              {client.coOwner && <div style={{ fontSize: 12, color: '#888', marginTop: 2 }}>Co-responsable: {client.coOwner}</div>}
+              <div style={{ fontSize: 18, fontWeight: 700 }}>{form.name}</div>
+              <div style={{ fontSize: 12, color: '#888' }}>DNI {form.dni}</div>
+              {form.coOwner && <div style={{ fontSize: 12, color: '#888', marginTop: 2 }}>Co-responsable: {form.coOwner}</div>}
             </div>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 18 }}>
-            <InfoTile icon={<IconPhone />} label="Teléfono" value={client.phone} />
-            <InfoTile icon={<IconMail />} label="Email" value={client.email} />
-            <InfoTile icon={<IconMapPin />} label="Domicilio" value={client.address} />
-            <InfoTile icon={<IconCalendar />} label="Última visita" value={client.lastVisit} />
+            <InfoTile icon={<IconPhone />} label="Teléfono" value={form.phone} />
+            <InfoTile icon={<IconMail />} label="Email" value={form.email} />
+            <InfoTile icon={<IconMapPin />} label="Domicilio" value={form.address} />
+            <InfoTile icon={<IconCalendar />} label="Última visita" value={form.lastVisit} />
           </div>
         </>
       ) : (
@@ -2696,10 +2737,8 @@ const ClientDrawer = ({ client, open, onClose, goToPet, goToMensajes }) => {
             <Field label="Teléfono"><Input value={form.phone} onChange={(e) => setForm({...form, phone: e.target.value})} /></Field>
             <Field label="Email"><Input value={form.email} onChange={(e) => setForm({...form, email: e.target.value})} /></Field>
           </div>
-          <Field label="Domicilio"><Input value={form.address} onChange={(e) => setForm({...form, address: e.target.value})} /></Field>
-          <div style={{ padding: 12, background: '#FAF7FA', border: '1px solid #EFE4EE', borderRadius: 8, fontSize: 12, color: '#888' }}>
-            Los cambios se guardan en la sesión actual del prototipo.
-          </div>
+          <Field label="Domicilio"><Input value={form.address || ''} onChange={(e) => setForm({...form, address: e.target.value})} /></Field>
+          {saveError && <div style={{ fontSize: 12, color: '#C2185B', background: '#FFF0F4', padding: '8px 12px', borderRadius: 8 }}>{saveError}</div>}
         </div>
       )}
       <div style={{ marginTop: 22, fontSize: 12, fontWeight: 700, color: '#666', letterSpacing: 0.4, textTransform: 'uppercase', marginBottom: 8 }}>Mascotas ({pets.length})</div>
@@ -2733,67 +2772,179 @@ const InfoTile = ({ icon, label, value }) => (
 
 const PetDrawer = ({ pet, open, onClose, goToConsultas, goToLibreta }) => {
   if (!pet) return null;
-  const owner = CLIENTS.find(c => c.id === pet.ownerId);
-  const ageY = 2026 - parseInt(pet.birth.split('-')[0]);
+  const owner = (window.CLIENTS || []).find(c => c.id === pet.ownerId);
+  const ageY = pet.birth ? parseInt((window.todayAR ? window.todayAR() : new Date().toISOString().slice(0,10)).slice(0,4)) - parseInt(pet.birth.split('-')[0]) : '?';
+  const [confirmFall, setConfirmFall] = React.useState(false);
+  const [fallData, setFallData] = React.useState({ deathDate: window.todayAR ? window.todayAR() : new Date().toISOString().slice(0,10), cause: '' });
+  const [editMode, setEditMode] = React.useState(false);
+  const [form, setForm] = React.useState({});
+  const [saving, setSaving] = React.useState(false);
+
+  React.useEffect(() => {
+    if (editMode) {
+      setForm({
+        nombre: pet.name || '',
+        especie: pet.species || 'Canino',
+        raza: pet.breed === '—' ? '' : (pet.breed || ''),
+        sexo: pet.sex || 'M',
+        fechaNacimiento: pet.birth || '',
+        peso: pet.weight || '',
+        color: pet.color === '—' ? '' : (pet.color || ''),
+        chip: pet.chip === '—' ? '' : (pet.chip || ''),
+        alergias: !pet.alergias || pet.alergias === '—' ? '' : pet.alergias,
+      });
+    }
+  }, [editMode]);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await window.Auth.put('/mascotas/' + pet.id, {
+        nombre: form.nombre, especie: form.especie, raza: form.raza || null,
+        sexo: form.sexo, fechaNacimiento: form.fechaNacimiento || null,
+        peso: form.peso ? +form.peso : null, color: form.color || null,
+        chip: form.chip || null, alergias: form.alergias || null,
+      });
+      window.PETS = (window.PETS || []).map(p => p.id === pet.id ? {
+        ...p, name: form.nombre, species: form.especie, breed: form.raza || '—',
+        sex: form.sexo, birth: form.fechaNacimiento,
+        weight: form.peso ? +form.peso : p.weight,
+        color: form.color || '—', chip: form.chip || '—',
+        alergias: form.alergias || 'Ninguna'
+      } : p);
+      setEditMode(false);
+    } catch (e) { console.error('Error guardando mascota:', e); }
+    setSaving(false);
+  };
+
+  const handleMarcarFallecido = async () => {
+    try {
+      await window.Auth.put('/mascotas/' + pet.id, {
+        estado: 'BAJA',
+        fechaFallecimiento: fallData.deathDate || new Date().toISOString().slice(0, 10),
+        causaFallecimiento: fallData.cause
+      });
+      window.PETS = (window.PETS || []).filter(p => p.id !== pet.id);
+    } catch (e) {}
+    setConfirmFall(false);
+    onClose();
+  };
+
+  const inpS = { height: 38, padding: '0 12px', borderRadius: 8, border: '1px solid #E0DCE0', fontSize: 14, fontFamily: 'inherit', outline: 'none', width: '100%', background: 'white', boxSizing: 'border-box' };
+
   return (
     <Drawer open={open} onClose={onClose} title="Ficha del paciente" width={560} footer={
-      <>
-        <Btn variant="ghost" onClick={onClose}>Cerrar</Btn>
-        <Btn variant="secondary" icon={<IconBook />} onClick={() => { onClose(); goToLibreta && goToLibreta(pet); }}>Libreta</Btn>
-        <Btn variant="primary" icon={<IconStethoscope />} onClick={() => { goToConsultas(pet); onClose(); }}>Nueva consulta</Btn>
-      </>
+      editMode ? (
+        <>
+          <Btn variant="ghost" onClick={() => setEditMode(false)}>Cancelar</Btn>
+          <Btn variant="primary" icon={<IconCheck />} onClick={handleSave} disabled={saving}>{saving ? 'Guardando...' : 'Guardar cambios'}</Btn>
+        </>
+      ) : (
+        <>
+          <Btn variant="ghost" onClick={onClose}>Cerrar</Btn>
+          <Btn variant="soft" icon={<span>🕊</span>} onClick={() => setConfirmFall(true)} style={{ color: '#888', fontSize: 12 }}>Fallecido</Btn>
+          <Btn variant="secondary" icon={<IconEdit />} onClick={() => setEditMode(true)}>Editar</Btn>
+          <Btn variant="secondary" icon={<IconBook />} onClick={() => { onClose(); goToLibreta && goToLibreta(pet); }}>Libreta</Btn>
+          <Btn variant="primary" icon={<IconStethoscope />} onClick={() => { goToConsultas(pet); onClose(); }}>Nueva consulta</Btn>
+        </>
+      )
     }>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-        <PetAvatar pet={pet} size={64} />
-        <div style={{ flex: 1 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div style={{ fontSize: 20, fontWeight: 700 }}>{pet.name}</div>
-            {pet.status === 'internado' && <Pill color="#D97706">internado</Pill>}
+      {editMode ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <Field label="Nombre"><input style={inpS} value={form.nombre} onChange={(e) => setForm({...form, nombre: e.target.value})} /></Field>
+            <Field label="Especie">
+              <select style={inpS} value={form.especie} onChange={(e) => setForm({...form, especie: e.target.value})}>
+                {['Canino','Felino','Ave','Exótico','Otro'].map(e => <option key={e}>{e}</option>)}
+              </select>
+            </Field>
           </div>
-          <div style={{ fontSize: 12, color: '#888', marginTop: 2 }}>{pet.species} · {pet.breed} · {pet.sex === 'M' ? 'Macho' : 'Hembra'} · {ageY} años · Nacido: {pet.birth}</div>
-        </div>
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginTop: 18 }}>
-        <Vital label="Peso" value={`${pet.weight}kg`} icon={<IconActivity />} />
-        <Vital label="Color" value={pet.color} icon={<IconActivity />} />
-        <Vital label="Chip" value={pet.chip === '—' ? 'Sin chip' : '✓ Sí'} icon={<IconShield />} color="#1F8A5B" />
-        <Vital label="Alergias" value={pet.alergias === 'Ninguna' || pet.alergias === 'Ninguna conocida' ? 'No' : '⚠ Sí'} icon={<IconAlert />} color={pet.alergias.includes('Ninguna') ? '#1F8A5B' : '#C2185B'} />
-      </div>
-      <div style={{ marginTop: 16, padding: 12, background: '#FAFAF8', borderRadius: 10 }}>
-        <div style={{ fontSize: 11, color: '#888', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.4 }}>Dueño</div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8 }}>
-          <Avatar name={owner.name} size={34} />
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 13, fontWeight: 600 }}>{owner.name}</div>
-            <div style={{ fontSize: 11, color: '#888' }}>{owner.phone} · {owner.email}</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <Field label="Raza"><input style={inpS} value={form.raza} onChange={(e) => setForm({...form, raza: e.target.value})} placeholder="Ej. Golden Retriever" /></Field>
+            <Field label="Sexo">
+              <div style={{ display: 'flex', gap: 6, height: 38 }}>
+                {['M','H'].map(s => <button key={s} onClick={() => setForm({...form, sexo: s})} style={{ flex: 1, borderRadius: 8, border: form.sexo === s ? '2px solid #A3007B' : '1px solid #E0DCE0', background: form.sexo === s ? '#FAF1F7' : 'white', color: form.sexo === s ? '#A3007B' : '#666', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', fontSize: 13 }}>{s === 'M' ? '♂ Macho' : '♀ Hembra'}</button>)}
+              </div>
+            </Field>
           </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+            <Field label="Fecha nacimiento"><input style={inpS} type="date" value={form.fechaNacimiento} onChange={(e) => setForm({...form, fechaNacimiento: e.target.value})} /></Field>
+            <Field label="Peso (kg)"><input style={inpS} type="number" step="0.1" value={form.peso} onChange={(e) => setForm({...form, peso: e.target.value})} placeholder="0.0" /></Field>
+            <Field label="Color"><input style={inpS} value={form.color} onChange={(e) => setForm({...form, color: e.target.value})} placeholder="Ej. Dorado" /></Field>
+          </div>
+          <Field label="Chip / microchip"><input style={inpS} value={form.chip} onChange={(e) => setForm({...form, chip: e.target.value})} placeholder="Nº de chip o vacío" /></Field>
+          <Field label="Alergias conocidas"><input style={inpS} value={form.alergias} onChange={(e) => setForm({...form, alergias: e.target.value})} placeholder="Ninguna" /></Field>
         </div>
-      </div>
-      <div style={{ marginTop: 22, fontSize: 12, fontWeight: 700, color: '#666', letterSpacing: 0.4, textTransform: 'uppercase', marginBottom: 8 }}>Últimas atenciones</div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {CONSULTAS.filter(c => c.petId === pet.id).slice(0, 3).map(c => (
-          <div key={c.id} style={{ padding: 12, border: '1px solid #EFEAEE', borderRadius: 10 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ fontSize: 13, fontWeight: 600 }}>{c.motivo}</div>
-              <div style={{ fontSize: 11, color: '#888' }}>{c.date}</div>
+      ) : (
+        <>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <PetAvatar pet={pet} size={64} />
+            <div style={{ flex: 1 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ fontSize: 20, fontWeight: 700 }}>{pet.name}</div>
+                {pet.status === 'internado' && <Pill color="#D97706">internado</Pill>}
+              </div>
+              <div style={{ fontSize: 12, color: '#888', marginTop: 2 }}>{pet.species} · {pet.breed} · {pet.sex === 'M' ? 'Macho' : 'Hembra'} · {ageY} años · Nacido: {pet.birth}</div>
             </div>
-            <div style={{ fontSize: 12, color: '#666', marginTop: 4, lineHeight: 1.5 }}>{c.diagnostico}</div>
           </div>
-        ))}
-      </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginTop: 18 }}>
+            <Vital label="Peso" value={`${pet.weight || 0}kg`} icon={<IconActivity />} />
+            <Vital label="Color" value={pet.color || '—'} icon={<IconActivity />} />
+            <Vital label="Chip" value={pet.chip === '—' || !pet.chip ? 'Sin chip' : '✓ Sí'} icon={<IconShield />} color="#1F8A5B" />
+            <Vital label="Alergias" value={!pet.alergias || pet.alergias.includes('Ninguna') ? 'No' : '⚠ Sí'} icon={<IconAlert />} color={!pet.alergias || pet.alergias.includes('Ninguna') ? '#1F8A5B' : '#C2185B'} />
+          </div>
+          {owner && <div style={{ marginTop: 16, padding: 12, background: '#FAFAF8', borderRadius: 10 }}>
+            <div style={{ fontSize: 11, color: '#888', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.4 }}>Dueño</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8 }}>
+              <Avatar name={owner.name} size={34} />
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>{owner.name}</div>
+                <div style={{ fontSize: 11, color: '#888' }}>{owner.phone} · {owner.email}</div>
+              </div>
+            </div>
+          </div>}
+          <div style={{ marginTop: 22, fontSize: 12, fontWeight: 700, color: '#666', letterSpacing: 0.4, textTransform: 'uppercase', marginBottom: 8 }}>Últimas atenciones</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {(window.CONSULTAS || []).filter(c => c.petId === pet.id).slice(0, 3).map(c => (
+              <div key={c.id} style={{ padding: 12, border: '1px solid #EFEAEE', borderRadius: 10 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ fontSize: 13, fontWeight: 600 }}>{c.motivo}</div>
+                  <div style={{ fontSize: 11, color: '#888' }}>{c.date}</div>
+                </div>
+                <div style={{ fontSize: 12, color: '#666', marginTop: 4, lineHeight: 1.5 }}>{c.diagnostico}</div>
+              </div>
+            ))}
+            {(window.CONSULTAS || []).filter(c => c.petId === pet.id).length === 0 && <div style={{ fontSize: 13, color: '#999', padding: '12px 0' }}>Sin consultas registradas</div>}
+          </div>
+        </>
+      )}
+
+      {confirmFall && (
+        <Modal open={true} onClose={() => setConfirmFall(false)} title="Registrar fallecimiento" width={440}
+          footer={<><Btn variant="ghost" onClick={() => setConfirmFall(false)}>Cancelar</Btn><Btn variant="danger" icon={<span>🕊</span>} onClick={handleMarcarFallecido} disabled={!fallData.cause.trim()}>Confirmar</Btn></>}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ padding: 12, background: '#FFF8F0', border: '1px solid #F5D9B5', borderRadius: 8, fontSize: 13, color: '#7A4A00' }}>
+              Esto moverá a <strong>{pet.name}</strong> al apartado de fallecidos.
+            </div>
+            <Field label="Fecha de fallecimiento"><Input type="date" value={fallData.deathDate} onChange={(e) => setFallData({...fallData, deathDate: e.target.value})} /></Field>
+            <Field label="Causa *"><textarea value={fallData.cause} onChange={(e) => setFallData({...fallData, cause: e.target.value})} rows={2} placeholder="Ej. Insuficiencia renal crónica" style={{ width: '100%', padding: 12, border: '1px solid #E0DCE0', borderRadius: 8, fontSize: 13, fontFamily: 'inherit', resize: 'vertical', outline: 'none' }} /></Field>
+          </div>
+        </Modal>
+      )}
     </Drawer>
   );
 };
 
 const NewConsultaModal = ({ open, onClose, onAdd }) => {
-  const [petId, setPetId] = useState(1);
+  const pets = window.PETS || [];
+  const [petId, setPetId] = useState(pets[0]?.id || 1);
   const [motivo, setMotivo] = useState('');
-  const [fecha, setFecha] = useState('2026-05-07');
+  const [fecha, setFecha] = useState(window.todayAR ? window.todayAR() : new Date().toISOString().slice(0,10));
   const [hora, setHora] = useState('11:00');
   const [vet, setVet] = useState('Dr. Balbi');
   const handleCreate = () => {
     if (!motivo.trim()) return;
-    const newC = { id: Date.now(), petId, date: fecha, time: hora, vet, motivo, anamnesis: '', diagnostico: '', tratamiento: '', peso: 0, temp: 38.5, fc: 88 };
+    const newC = { id: Date.now(), petId, date: fecha, time: hora, vet, motivo, anamnesis: '', diagnostico: '', tratamiento: '', peso: 0, temp: 38.5, fc: 88, estado: 'Estable' };
     if (onAdd) onAdd(newC);
     setMotivo('');
     onClose();
@@ -2808,8 +2959,8 @@ const NewConsultaModal = ({ open, onClose, onAdd }) => {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         <Field label="Paciente">
           <select value={petId} onChange={(e) => setPetId(+e.target.value)} style={{ height: 38, padding: '0 12px', borderRadius: 8, border: '1px solid #E0DCE0', fontSize: 14, fontFamily: 'inherit', outline: 'none' }}>
-            {PETS.map(p => {
-              const o = CLIENTS.find(c => c.id === p.ownerId);
+            {pets.map(p => {
+              const o = (window.CLIENTS || []).find(c => c.id === p.ownerId);
               return <option key={p.id} value={p.id}>{p.name} — {o?.name}</option>;
             })}
           </select>
@@ -2842,36 +2993,99 @@ window.NewConsultaModal = NewConsultaModal;
 <script type="text/babel">
 // Consultas: timeline + autosave + Libreta cards + Mensajes chat + Agenda Google-Calendar style
 const ConsultaTimeline = ({ pet, openNewConsulta }) => {
-  const [consultasList, setConsultasList] = useState(CONSULTAS.filter(c => c.petId === pet.id).sort((a, b) => b.date.localeCompare(a.date)));
-  const [selected, setSelected] = useState(consultasList[0]?.id);
+  const [consultasList, setConsultasList] = useState([]);
+  const [selected, setSelected] = useState(null);
   const sel = consultasList.find(c => c.id === selected) || consultasList[0];
+  const isAdmin = window.Auth?.getRole?.() === 'admin';
+  const isLocked = !!(sel && sel.id && sel.id < 2000000000);
   const [anam, setAnam] = useState(sel?.anamnesis || '');
   const [diag, setDiag] = useState(sel?.diagnostico || '');
   const [trat, setTrat] = useState(sel?.tratamiento || '');
   const [savedField, setSavedField] = useState(null);
   const [editingVitals, setEditingVitals] = useState(false);
-  const [vitals, setVitals] = useState({ peso: sel?.peso, temp: sel?.temp, fc: sel?.fc, estado: sel?.estado || 'Estable' });
+  const [vitals, setVitals] = useState({ peso: sel?.peso || 0, temp: sel?.temp || 38.5, fc: sel?.fc || 88, estado: sel?.estado || 'Estable' });
   const [adjuntarModal, setAdjuntarModal] = useState(false);
+  const [adjFile, setAdjFile] = useState(null);
+  const [adjError, setAdjError] = useState('');
+  const [adjUploading, setAdjUploading] = useState(false);
+  const [adjFiles, setAdjFiles] = useState([]);
   const [recetaModal, setRecetaModal] = useState(false);
+  const [showNewModal, setShowNewModal] = useState(false);
+
+  React.useEffect(() => {
+    if (!pet) return;
+    const params = new URLSearchParams({ mascotaID: pet.id, pageSize: 20 });
+    window.Auth.get('/files?' + params.toString()).then(res => setAdjFiles(res.data || [])).catch(() => {});
+  }, [pet?.id]);
+
+  React.useEffect(() => {
+    if (!pet?.id) return;
+    window.Auth.get('/consultas?mascotaID=' + pet.id).then(res => {
+      const raw = Array.isArray(res) ? res : (res.data || []);
+      const mapped = raw.map(c => ({
+        id: c.id, petId: c.mascotaID,
+        date: (c.createdAt || '').slice(0, 10),
+        time: (c.createdAt || '').slice(11, 16),
+        vet: c.vet || 'Dr. Balbi',
+        motivo: c.motivoConsulta || c.nota || 'Consulta',
+        anamnesis: c.nota || '',
+        diagnostico: c.diagnostico || '',
+        tratamiento: c.planTratamiento || '',
+        peso: parseFloat(c.pesoKg) || 0,
+        temp: c.extra?.temp || 38.5,
+        fc: c.extra?.fc || 88,
+        estado: c.extra?.estado || 'Estable',
+      })).sort((a, b) => b.date.localeCompare(a.date));
+      setConsultasList(mapped);
+      if (mapped.length) setSelected(mapped[0].id);
+    }).catch(() => {});
+  }, [pet?.id]);
 
   useEffect(() => {
     const s = consultasList.find(c => c.id === selected) || consultasList[0];
     setAnam(s?.anamnesis || '');
     setDiag(s?.diagnostico || '');
     setTrat(s?.tratamiento || '');
-    setVitals({ peso: s?.peso, temp: s?.temp, fc: s?.fc, estado: s?.estado || 'Estable' });
+    setVitals({ peso: s?.peso || 0, temp: s?.temp || 38.5, fc: s?.fc || 88, estado: s?.estado || 'Estable' });
   }, [selected, consultasList]);
 
   const triggerSave = (field) => { setSavedField(field); setTimeout(() => setSavedField(null), 1800); };
 
   const saveCurrentConsulta = () => {
     setConsultasList(consultasList.map(c => c.id === sel?.id ? { ...c, anamnesis: anam, diagnostico: diag, tratamiento: trat, ...vitals } : c));
+    if (sel?.id) {
+      window.Auth.put('/consultas/' + sel.id, {
+        nota: anam,
+        diagnostico: diag,
+        planTratamiento: trat,
+        pesoKg: vitals.peso || null,
+        extra: { temp: vitals.temp, fc: vitals.fc, estado: vitals.estado }
+      }).catch(() => {});
+    }
+    if (pet?.id && vitals.peso) {
+      window.Auth.put('/mascotas/' + pet.id, { peso: +vitals.peso }).then(() => {
+        window.PETS = (window.PETS || []).map(p => p.id === pet.id ? { ...p, weight: +vitals.peso } : p);
+      }).catch(() => {});
+    }
     triggerSave('all');
   };
 
-  const addConsultaToList = (newC) => {
-    setConsultasList([newC, ...consultasList]);
-    setSelected(newC.id);
+  const addConsultaToList = async (newC) => {
+    try {
+      const res = await window.Auth.post('/consultas', {
+        mascotaID: newC.petId,
+        motivoConsulta: newC.motivo,
+        vet: newC.vet,
+        pesoKg: newC.peso || null,
+        extra: { temp: newC.temp, fc: newC.fc, estado: newC.estado }
+      });
+      const saved = { ...newC, id: res.id };
+      setConsultasList(prev => [saved, ...prev]);
+      setSelected(saved.id);
+    } catch (e) {
+      setConsultasList(prev => [newC, ...prev]);
+      setSelected(newC.id);
+    }
   };
 
   return (
@@ -2880,7 +3094,7 @@ const ConsultaTimeline = ({ pet, openNewConsulta }) => {
       <div style={{ borderRight: '1px solid #EFEAEE', overflow: 'auto', padding: '20px 18px', background: '#FAFAF8' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: '#1A1A1A' }}>Historia clínica</div>
-          <Btn size="sm" icon={<IconPlus />} onClick={openNewConsulta}>Nueva</Btn>
+          <Btn size="sm" icon={<IconPlus />} onClick={() => setShowNewModal(true)}>Nueva</Btn>
         </div>
         <div style={{ position: 'relative', paddingLeft: 18 }}>
           <div style={{ position: 'absolute', left: 6, top: 6, bottom: 6, width: 2, background: '#EFE4EC' }} />
@@ -2905,7 +3119,7 @@ const ConsultaTimeline = ({ pet, openNewConsulta }) => {
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6 }}>
             <div style={{ fontSize: 20, fontWeight: 700 }}>{sel?.motivo}</div>
-            <Pill color="#A3007B">en edición</Pill>
+            {isLocked && !isAdmin ? <Pill color="#666">guardada</Pill> : <Pill color="#A3007B">en edición</Pill>}
           </div>
           <div style={{ fontSize: 12, color: '#888' }}>{sel?.date} · {sel?.time} · {sel?.vet}</div>
         </div>
@@ -2913,15 +3127,15 @@ const ConsultaTimeline = ({ pet, openNewConsulta }) => {
         <div>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: '#666', textTransform: 'uppercase', letterSpacing: 0.4 }}>Signos vitales</div>
-            <button onClick={() => setEditingVitals(!editingVitals)} style={{ background: 'transparent', border: 'none', color: '#A3007B', fontSize: 11, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, padding: 0, fontFamily: 'inherit' }}>
+            {(!isLocked || isAdmin) && <button onClick={() => setEditingVitals(!editingVitals)} style={{ background: 'transparent', border: 'none', color: '#A3007B', fontSize: 11, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, padding: 0, fontFamily: 'inherit' }}>
               <IconEdit size={11} /> {editingVitals ? 'Listo' : 'Editar'}
-            </button>
+            </button>}
           </div>
           {!editingVitals ? (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
-              <Vital label="Peso" value={`${vitals.peso} kg`} icon={<IconActivity />} />
-              <Vital label="Temperatura" value={`${vitals.temp}°C`} icon={<IconActivity />} />
-              <Vital label="FC" value={`${vitals.fc} bpm`} icon={<IconHeart />} />
+              <Vital label="Peso" value={`${vitals.peso != null ? vitals.peso : 0} kg`} icon={<IconActivity />} />
+              <Vital label="Temperatura" value={`${vitals.temp != null ? vitals.temp : 38.5}°C`} icon={<IconActivity />} />
+              <Vital label="FC" value={`${vitals.fc != null ? vitals.fc : 88} bpm`} icon={<IconHeart />} />
               <Vital label="Estado" value={vitals.estado} icon={<IconCheckCircle />} color={vitals.estado === 'Estable' ? '#1F8A5B' : vitals.estado === 'Crítico' ? '#C2185B' : '#D97706'} />
             </div>
           ) : (
@@ -2937,44 +3151,80 @@ const ConsultaTimeline = ({ pet, openNewConsulta }) => {
             </div>
           )}
         </div>
+        {isLocked && !isAdmin && (
+          <div style={{ padding: '10px 14px', background: '#F5F3FF', border: '1px solid #C4B5FD', borderRadius: 8, fontSize: 12.5, color: '#5B21B6', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span>🔒</span> Consulta guardada — solo el administrador puede editarla
+          </div>
+        )}
         <Field label="Anamnesis" autosaved={savedField === 'anam'}>
-          <textarea value={anam} onChange={(e) => { setAnam(e.target.value); triggerSave('anam'); }} rows={3} style={{ width: '100%', padding: 12, border: '1px solid #E0DCE0', borderRadius: 8, fontSize: 13, fontFamily: 'inherit', resize: 'vertical', outline: 'none', lineHeight: 1.5 }} onFocus={(e) => e.target.style.borderColor = '#A3007B'} onBlur={(e) => e.target.style.borderColor = '#E0DCE0'} />
+          <textarea value={anam} onChange={(e) => { if (!isLocked || isAdmin) { setAnam(e.target.value); triggerSave('anam'); } }} readOnly={isLocked && !isAdmin} rows={3} style={{ width: '100%', padding: 12, border: '1px solid #E0DCE0', borderRadius: 8, fontSize: 13, fontFamily: 'inherit', resize: 'vertical', outline: 'none', lineHeight: 1.5, background: isLocked && !isAdmin ? '#FAFAF8' : 'white' }} onFocus={(e) => { if (!isLocked || isAdmin) e.target.style.borderColor = '#A3007B'; }} onBlur={(e) => e.target.style.borderColor = '#E0DCE0'} />
         </Field>
         <Field label="Diagnóstico" autosaved={savedField === 'diag'}>
-          <textarea value={diag} onChange={(e) => { setDiag(e.target.value); triggerSave('diag'); }} rows={2} style={{ width: '100%', padding: 12, border: '1px solid #E0DCE0', borderRadius: 8, fontSize: 13, fontFamily: 'inherit', resize: 'vertical', outline: 'none', lineHeight: 1.5 }} onFocus={(e) => e.target.style.borderColor = '#A3007B'} onBlur={(e) => e.target.style.borderColor = '#E0DCE0'} />
+          <textarea value={diag} onChange={(e) => { if (!isLocked || isAdmin) { setDiag(e.target.value); triggerSave('diag'); } }} readOnly={isLocked && !isAdmin} rows={2} style={{ width: '100%', padding: 12, border: '1px solid #E0DCE0', borderRadius: 8, fontSize: 13, fontFamily: 'inherit', resize: 'vertical', outline: 'none', lineHeight: 1.5, background: isLocked && !isAdmin ? '#FAFAF8' : 'white' }} onFocus={(e) => { if (!isLocked || isAdmin) e.target.style.borderColor = '#A3007B'; }} onBlur={(e) => e.target.style.borderColor = '#E0DCE0'} />
         </Field>
         <Field label="Tratamiento" autosaved={savedField === 'trat'}>
-          <textarea value={trat} onChange={(e) => { setTrat(e.target.value); triggerSave('trat'); }} rows={3} style={{ width: '100%', padding: 12, border: '1px solid #E0DCE0', borderRadius: 8, fontSize: 13, fontFamily: 'inherit', resize: 'vertical', outline: 'none', lineHeight: 1.5 }} onFocus={(e) => e.target.style.borderColor = '#A3007B'} onBlur={(e) => e.target.style.borderColor = '#E0DCE0'} />
+          <textarea value={trat} onChange={(e) => { if (!isLocked || isAdmin) { setTrat(e.target.value); triggerSave('trat'); } }} readOnly={isLocked && !isAdmin} rows={3} style={{ width: '100%', padding: 12, border: '1px solid #E0DCE0', borderRadius: 8, fontSize: 13, fontFamily: 'inherit', resize: 'vertical', outline: 'none', lineHeight: 1.5, background: isLocked && !isAdmin ? '#FAFAF8' : 'white' }} onFocus={(e) => { if (!isLocked || isAdmin) e.target.style.borderColor = '#A3007B'; }} onBlur={(e) => e.target.style.borderColor = '#E0DCE0'} />
         </Field>
         <div style={{ display: 'flex', gap: 8, paddingTop: 8 }}>
           <Btn variant="secondary" icon={<IconFile />} onClick={() => setAdjuntarModal(true)}>Adjuntar estudio</Btn>
           <Btn variant="secondary" icon={<IconPill />} onClick={() => setRecetaModal(true)}>Generar receta</Btn>
           <div style={{ flex: 1 }} />
-          <Btn variant="primary" icon={<IconCheck />} onClick={saveCurrentConsulta}>Guardar consulta</Btn>
+          {(!isLocked || isAdmin) && <Btn variant="primary" icon={<IconCheck />} onClick={saveCurrentConsulta}>Guardar consulta</Btn>}
         </div>
       </div>
 
       {/* Adjuntar estudio modal */}
-      {adjuntarModal && (
-        <Modal open={true} onClose={() => setAdjuntarModal(false)} title="Adjuntar estudio" width={460}
-          footer={<><Btn variant="ghost" onClick={() => setAdjuntarModal(false)}>Cancelar</Btn><Btn variant="primary" icon={<IconCheck />} onClick={() => { setAdjuntarModal(false); }}>Adjuntar</Btn></>}>
+      {adjuntarModal && (() => {
+        const MAX_MB = 50;
+        const handleFile = (f) => {
+          if (!f) return;
+          if (f.size > MAX_MB * 1024 * 1024) { setAdjError(`El archivo supera los ${MAX_MB} MB`); setAdjFile(null); return; }
+          const ok = /\.(pdf|jpg|jpeg|png|mp4)$/i.test(f.name);
+          if (!ok) { setAdjError('Formato no permitido. Usá PDF, JPG, PNG o MP4.'); setAdjFile(null); return; }
+          setAdjError(''); setAdjFile(f);
+        };
+        const doUpload = async () => {
+          if (!adjFile) { setAdjError('Seleccioná un archivo'); return; }
+          setAdjUploading(true); setAdjError('');
+          try {
+            const fd = new FormData();
+            fd.append('file', adjFile);
+            fd.append('pacienteID', pet.ownerId);
+            fd.append('mascotaID', pet.id);
+            const r = await fetch(`${window.API_BASE}/files`, { method: 'POST', headers: { Authorization: `Bearer ${window.Auth.getToken()}` }, body: fd });
+            if (!r.ok) { const e = await r.json(); throw new Error(e.error || 'Error al subir'); }
+            const created = await r.json();
+            setAdjFiles(prev => [created, ...prev]);
+            setAdjFile(null); setAdjuntarModal(false);
+          } catch (e) { setAdjError(e.message); }
+          setAdjUploading(false);
+        };
+        return (
+        <Modal open={true} onClose={() => { setAdjuntarModal(false); setAdjFile(null); setAdjError(''); }} title="Adjuntar estudio" width={480}
+          footer={<><Btn variant="ghost" onClick={() => { setAdjuntarModal(false); setAdjFile(null); setAdjError(''); }}>Cancelar</Btn><Btn variant="primary" icon={<IconCheck />} onClick={doUpload} disabled={adjUploading}>{adjUploading ? 'Subiendo…' : 'Adjuntar'}</Btn></>}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <Field label="Tipo de estudio">
-              <select style={{ height: 38, padding: '0 12px', borderRadius: 8, border: '1px solid #E0DCE0', fontSize: 14, fontFamily: 'inherit', outline: 'none', width: '100%' }}>
-                <option>Hemograma completo</option><option>Perfil hepático</option><option>Perfil renal</option><option>Rx torácica</option><option>Ecografía abdominal</option><option>Otro</option>
-              </select>
-            </Field>
-            <Field label="Archivo (PDF o imagen)">
-              <div style={{ border: '2px dashed #E0DCE0', borderRadius: 8, padding: '28px 16px', textAlign: 'center', color: '#888', fontSize: 13, cursor: 'pointer', background: '#FAFAF8' }}>
+            <Field label="Archivo (PDF, JPG, PNG, MP4)">
+              <label style={{ display: 'block', border: `2px dashed ${adjFile ? '#1F8A5B' : '#E0DCE0'}`, borderRadius: 8, padding: '28px 16px', textAlign: 'center', color: adjFile ? '#1F8A5B' : '#888', fontSize: 13, cursor: 'pointer', background: '#FAFAF8' }}>
+                <input type="file" accept=".pdf,.jpg,.jpeg,.png,.mp4" style={{ display: 'none' }} onChange={(e) => handleFile(e.target.files[0])} />
                 <div style={{ fontSize: 24, marginBottom: 6 }}>📎</div>
-                <div>Arrastrá un archivo o hacé clic para seleccionar</div>
-                <div style={{ fontSize: 11, marginTop: 4, color: '#AAA' }}>PDF, JPG, PNG — máx. 10 MB</div>
-              </div>
+                {adjFile ? <><div style={{ fontWeight: 700 }}>{adjFile.name}</div><div style={{ fontSize: 11, marginTop: 4, color: '#666' }}>{(adjFile.size/1024/1024).toFixed(2)} MB</div></> : <><div>Hacé clic para seleccionar un archivo</div><div style={{ fontSize: 11, marginTop: 4, color: '#AAA' }}>PDF, JPG, PNG, MP4 — máx. {MAX_MB} MB</div></>}
+              </label>
             </Field>
-            <Field label="Observaciones"><Input placeholder="Descripción breve del estudio…" /></Field>
+            {adjError && <div style={{ fontSize: 12, color: '#C2185B', background: '#FFF0F4', padding: '8px 12px', borderRadius: 8 }}>{adjError}</div>}
+            {adjFiles.length > 0 && (
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#666', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 6 }}>Archivos anteriores</div>
+                {adjFiles.slice(0, 5).map(f => (
+                  <a key={f.id} href={f.url || '#'} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', borderBottom: '1px solid #F4F0F2', color: '#1A1A1A', textDecoration: 'none', fontSize: 12 }}>
+                    <IconFile size={14} /><span style={{ flex: 1 }}>{f.nombreArchivo || 'archivo'}</span><span style={{ color: '#888' }}>{f.tipoArchivo}</span>
+                  </a>
+                ))}
+              </div>
+            )}
           </div>
         </Modal>
-      )}
+        );
+      })()}
 
       {/* Generar receta modal */}
       {recetaModal && (
@@ -2982,7 +3232,7 @@ const ConsultaTimeline = ({ pet, openNewConsulta }) => {
           footer={<><Btn variant="ghost" onClick={() => setRecetaModal(false)}>Cancelar</Btn><Btn variant="primary" icon={<IconFile />} onClick={() => { setRecetaModal(false); }}>Generar PDF</Btn></>}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div style={{ padding: 12, background: '#FAF1F7', borderRadius: 8, fontSize: 12.5, color: '#A3007B', fontWeight: 600 }}>
-              Paciente: {pet?.name} — {CLIENTS.find(c => c.id === pet?.ownerId)?.name}
+              Paciente: {pet?.name} — {(window.CLIENTS||[]).find(c => c.id === pet?.ownerId)?.name}
             </div>
             <Field label="Medicamento 1"><Input placeholder="Ej. Meloxicam 1.5mg/ml" defaultValue={trat.split('\n')[0] || ''} /></Field>
             <Field label="Dosis y frecuencia"><Input placeholder="0.1 mg/kg SID por 5 días" /></Field>
@@ -2994,6 +3244,7 @@ const ConsultaTimeline = ({ pet, openNewConsulta }) => {
           </div>
         </Modal>
       )}
+      {showNewModal && <NewConsultaModal open={true} onClose={() => setShowNewModal(false)} onAdd={addConsultaToList} />}
     </div>
   );
 };
@@ -3007,27 +3258,107 @@ const Vital = ({ label, value, icon, color = '#A3007B' }) => (
   </div>
 );
 
+// Buscador de mascotas reutilizable — busca por nombre de mascota o dueño
+const PetSearchPicker = ({ petId, onSelect, placeholder = 'Buscar mascota o dueño…' }) => {
+  const [q, setQ] = useState('');
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  const inputRef = useRef(null);
+  const pet = (window.PETS || []).find(p => p.id === petId);
+  const owner = (window.CLIENTS || []).find(c => c.id === pet?.ownerId);
+
+  const results = q.trim().length > 0
+    ? (window.PETS || []).filter(p => {
+        const o = (window.CLIENTS || []).find(c => c.id === p.ownerId);
+        const ql = q.toLowerCase();
+        return p.name?.toLowerCase().includes(ql) || o?.name?.toLowerCase().includes(ql);
+      }).slice(0, 10)
+    : [];
+
+  useEffect(() => {
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const openSearch = () => { setOpen(true); setQ(''); setTimeout(() => inputRef.current?.focus(), 0); };
+  const pick = (id) => { onSelect(id); setOpen(false); setQ(''); };
+
+  return (
+    <div ref={ref} style={{ position: 'relative', width: 300 }}>
+      {open ? (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, border: '2px solid #A3007B', borderRadius: 8, padding: '0 12px', height: 36, background: 'white' }}>
+          <IconSearch size={14} color="#A3007B" />
+          <input ref={inputRef} value={q} onChange={e => setQ(e.target.value)}
+            placeholder={placeholder}
+            style={{ border: 'none', outline: 'none', fontSize: 13, fontFamily: 'inherit', flex: 1, background: 'transparent' }} />
+          {q && <button onClick={() => setQ('')} style={{ background: 'none', border: 'none', color: '#999', cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: 0 }}>×</button>}
+        </div>
+      ) : (
+        <button onClick={openSearch} style={{ width: '100%', height: 36, display: 'flex', alignItems: 'center', gap: 8, padding: '0 12px', border: '1px solid #E0DCE0', borderRadius: 8, background: 'white', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
+          <IconSearch size={14} color="#999" />
+          <span style={{ flex: 1, fontSize: 13, color: pet ? '#1A1A1A' : '#999', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {pet ? `${pet.name} — ${owner?.name || '?'}` : placeholder}
+          </span>
+          <span style={{ fontSize: 10, color: '#BBB' }}>▼</span>
+        </button>
+      )}
+
+      {open && (
+        <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, background: 'white', border: '1px solid #E0DCE0', borderRadius: 10, boxShadow: '0 6px 20px rgba(0,0,0,0.1)', zIndex: 200, overflow: 'hidden' }}>
+          {results.length === 0 ? (
+            <div style={{ padding: '20px 16px', textAlign: 'center', color: '#999', fontSize: 13 }}>
+              {q.trim() ? 'Sin resultados' : 'Escribí para buscar…'}
+            </div>
+          ) : results.map(p => {
+            const o = (window.CLIENTS || []).find(c => c.id === p.ownerId);
+            return (
+              <div key={p.id} onClick={() => pick(p.id)}
+                style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 14px', cursor: 'pointer', borderBottom: '1px solid #F4F0F2', background: p.id === petId ? '#FAF1F7' : 'white', transition: 'background .1s' }}
+                onMouseEnter={e => { if (p.id !== petId) e.currentTarget.style.background = '#FAF7FA'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = p.id === petId ? '#FAF1F7' : 'white'; }}>
+                <PetAvatar pet={p} size={32} />
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#1A1A1A' }}>{p.name}</div>
+                  <div style={{ fontSize: 11, color: '#888' }}>{p.species || 'Animal'} · {o?.name || 'Sin dueño'}</div>
+                </div>
+                {p.id === petId && <span style={{ marginLeft: 'auto', fontSize: 10, color: '#A3007B', fontWeight: 700 }}>✓</span>}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+window.PetSearchPicker = PetSearchPicker;
+
 // ConsultasView wrapper - pick patient first or open timeline
 const ConsultasView = () => {
-  const [petId, setPetId] = useState(1);
+  const [petId, setPetId] = useState(null);
   const [newConsulta, setNewConsulta] = useState(false);
   const [timelineRef, setTimelineRef] = useState(null);
-  const pet = PETS.find(p => p.id === petId);
+  const pet = (window.PETS||[]).find(p => p.id === petId);
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <div style={{ padding: '14px 24px', borderBottom: '1px solid #EFEAEE', display: 'flex', gap: 12, alignItems: 'center', background: 'white' }}>
         <PetAvatar pet={pet} size={40} />
         <div>
-          <div style={{ fontSize: 15, fontWeight: 700 }}>{pet?.name}</div>
-          <div style={{ fontSize: 12, color: '#888' }}>{pet?.species} · {pet?.breed} · {CLIENTS.find(c => c.id === pet?.ownerId)?.name}</div>
+          <div style={{ fontSize: 15, fontWeight: 700 }}>{pet?.name || 'Seleccioná un paciente'}</div>
+          <div style={{ fontSize: 12, color: '#888' }}>{pet ? `${pet.species || ''} · ${pet.breed || ''} · ${(window.CLIENTS||[]).find(c => c.id === pet.ownerId)?.name || ''}` : 'Buscá por nombre de mascota o dueño'}</div>
         </div>
         <div style={{ flex: 1 }} />
-        <select value={petId} onChange={(e) => setPetId(+e.target.value)} style={{ height: 36, padding: '0 32px 0 12px', borderRadius: 8, border: '1px solid #E0DCE0', fontSize: 13, fontFamily: 'inherit', background: 'white', cursor: 'pointer', outline: 'none' }}>
-          {PETS.map(p => <option key={p.id} value={p.id}>{p.name} — {CLIENTS.find(c => c.id === p.ownerId)?.name}</option>)}
-        </select>
+        <PetSearchPicker petId={petId} onSelect={setPetId} />
       </div>
       <div style={{ flex: 1, overflow: 'hidden' }}>
-        <ConsultaTimeline key={petId} pet={pet} openNewConsulta={() => setNewConsulta(true)} />
+        {pet
+          ? <ConsultaTimeline key={petId} pet={pet} openNewConsulta={() => setNewConsulta(true)} />
+          : <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 12, color: '#999' }}>
+              <IconSearch size={40} color="#E0DCE0" />
+              <div style={{ fontSize: 15, fontWeight: 600, color: '#BBB' }}>Buscá una mascota para ver su historia clínica</div>
+              <div style={{ fontSize: 13, color: '#CCC' }}>Podés buscar por nombre de la mascota o del dueño</div>
+            </div>
+        }
       </div>
       <NewConsultaModal open={newConsulta} onClose={() => setNewConsulta(false)} />
     </div>
@@ -3041,58 +3372,84 @@ window.ConsultasView = ConsultasView;
 
 <script type="text/babel">
 // Libreta sanitaria - tarjetas categorizadas
-const LIBRETA_CATS = [
-  { id: 'vacunas', label: 'Vacunas', icon: IconSyringe, color: '#A3007B', count: 3, items: [
-    { name: 'Séxtuple (DHPPi+L)', date: '2026-02-12', proxima: '2027-02-12', status: 'vigente' },
-    { name: 'Antirrábica', date: '2025-08-03', proxima: '2026-08-03', status: 'vigente' },
-    { name: 'Tos de las perreras', date: '2025-08-03', proxima: '2026-08-03', status: 'proxima' },
-  ] },
-  { id: 'antiparasitarios', label: 'Antiparasitarios', icon: IconShield, color: '#1F8A5B', count: 2, items: [
-    { name: 'NexGard Spectra', date: '2026-04-15', proxima: '2026-05-15', status: 'vigente' },
-    { name: 'Drontal Plus', date: '2026-01-10', proxima: '2026-04-10', status: 'vencido' },
-  ] },
-  { id: 'cirugias', label: 'Cirugías', icon: IconScissors, color: '#7A3FBF', count: 1, items: [
-    { name: 'OSH (castración)', date: '2025-07-20', proxima: null, status: 'completada' },
-  ] },
-  { id: 'estudios', label: 'Estudios', icon: IconFile, color: '#2D5BA0', count: 4, items: [
-    { name: 'Hemograma completo', date: '2026-05-04', status: 'normal' },
-    { name: 'Perfil hepático', date: '2026-05-04', status: 'normal' },
-    { name: 'Rx tórax', date: '2025-11-08', status: 'normal' },
-    { name: 'Ecografía abdominal', date: '2025-07-15', status: 'normal' },
-  ] },
-  { id: 'medicacion', label: 'Medicación', icon: IconPill, color: '#D97706', count: 2, items: [
-    { name: 'Meloxicam 0.1mg/kg', date: '2026-05-04', status: 'activa' },
-    { name: 'Cefalexina 22mg/kg', date: '2025-11-08', status: 'finalizada' },
-  ] },
-  { id: 'alergias', label: 'Alergias', icon: IconAlert, color: '#C2185B', count: 0, items: [] },
+const PetSearchPicker = window.PetSearchPicker;
+const LIBRETA_CATS_TEMPLATE = [
+  { id: 'vacunas',          label: 'Vacunas',           icon: IconSyringe,  color: '#A3007B' },
+  { id: 'antiparasitarios', label: 'Antiparasitarios',  icon: IconShield,   color: '#1F8A5B' },
+  { id: 'cirugias',         label: 'Cirugías',           icon: IconScissors, color: '#7A3FBF' },
+  { id: 'estudios',         label: 'Estudios',           icon: IconFile,     color: '#2D5BA0' },
+  { id: 'medicacion',       label: 'Medicación',         icon: IconPill,     color: '#D97706' },
+  { id: 'alergias',         label: 'Alergias',           icon: IconAlert,    color: '#C2185B' },
 ];
 
 const LibretaView = () => {
-  const [petId, setPetId] = useState(1);
-  const pet = PETS.find(p => p.id === petId);
-  const owner = CLIENTS.find(c => c.id === pet?.ownerId);
+  const [petId, setPetId] = useState(() => window._LIBRETA_PET_ID || (window.PETS?.[0]?.id) || null);
+  const pet = (window.PETS || []).find(p => p.id === petId);
+  const owner = (window.CLIENTS || []).find(c => c.id === pet?.ownerId);
   const [open, setOpen] = useState('vacunas');
   const [addModal, setAddModal] = useState(null);
-  const [editModal, setEditModal] = useState(null); // { catId, catColor, idx, item }
-  const [cats, setCats] = useState(LIBRETA_CATS);
+  const [editModal, setEditModal] = useState(null);
+  const [cats, setCats] = useState(LIBRETA_CATS_TEMPLATE.map(c => ({ ...c, items: [], count: 0 })));
   const [formData, setFormData] = useState(null);
+  const [loading, setLoading] = useState(false);
 
-  const handleAddItem = () => {
+  useEffect(() => {
+    if (!petId) return;
+    setLoading(true);
+    window.Auth.get('/libreta?mascotaID=' + petId).then(res => {
+      const items = Array.isArray(res) ? res : (res.data || []);
+      setCats(LIBRETA_CATS_TEMPLATE.map(cat => {
+        const ci = items.filter(i => i.categoria === cat.id);
+        return { ...cat, count: ci.length, items: ci.map(i => ({ _id: i.id, name: i.nombre, date: i.fecha || '', proxima: i.proxima || '', status: i.status || 'vigente', notas: i.notas || '' })) };
+      }));
+    }).catch(() => {}).finally(() => setLoading(false));
+  }, [petId]);
+
+  const syncAlergias = (newCats) => {
+    if (!petId) return;
+    const names = (newCats.find(c => c.id === 'alergias')?.items || []).map(i => i.name);
+    const alergias = names.length ? names.join(', ') : 'Ninguna';
+    window.Auth.put('/mascotas/' + petId, { alergias }).catch(() => {});
+    window.PETS = (window.PETS || []).map(p => p.id === petId ? { ...p, alergias } : p);
+  };
+
+  const handleAddItem = async () => {
     if (!formData || !formData.name) return;
-    setCats(cats.map(c => c.id === addModal.catId ? { ...c, items: [...c.items, { name: formData.name, date: formData.date || new Date().toISOString().slice(0,10), proxima: formData.proxima || null, status: formData.status || 'vigente' }], count: c.count + 1 } : c));
-    setAddModal(null);
-    setFormData(null);
+    try {
+      const res = await window.Auth.post('/libreta', {
+        mascotaID: petId, categoria: addModal.catId, nombre: formData.name,
+        fecha: formData.date || null, proxima: formData.proxima || null,
+        status: formData.status || 'vigente', notas: formData.notas || null
+      });
+      const newItem = { _id: res.id, name: res.nombre, date: res.fecha || '', proxima: res.proxima || '', status: res.status || 'vigente', notas: res.notas || '' };
+      const newCats = cats.map(c => c.id === addModal.catId ? { ...c, items: [...c.items, newItem], count: c.count + 1 } : c);
+      setCats(newCats);
+      if (addModal.catId === 'alergias') syncAlergias(newCats);
+    } catch (e) { console.error('Error guardando:', e); }
+    setAddModal(null); setFormData(null);
   };
 
-  const handleEditItem = () => {
+  const handleEditItem = async () => {
     if (!formData || !editModal) return;
-    setCats(cats.map(c => c.id === editModal.catId ? { ...c, items: c.items.map((it, i) => i === editModal.idx ? { ...it, ...formData } : it) } : c));
-    setEditModal(null);
-    setFormData(null);
+    try {
+      await window.Auth.put('/libreta/' + editModal.itemId, {
+        nombre: formData.name, fecha: formData.date || null,
+        proxima: formData.proxima || null, status: formData.status, notas: formData.notas || null
+      });
+      const newCats = cats.map(c => c.id === editModal.catId ? { ...c, items: c.items.map((it, i) => i === editModal.idx ? { ...it, ...formData } : it) } : c);
+      setCats(newCats);
+      if (editModal.catId === 'alergias') syncAlergias(newCats);
+    } catch (e) { console.error('Error editando:', e); }
+    setEditModal(null); setFormData(null);
   };
 
-  const handleDeleteItem = (catId, idx) => {
-    setCats(cats.map(c => c.id === catId ? { ...c, items: c.items.filter((_, i) => i !== idx), count: c.count - 1 } : c));
+  const handleDeleteItem = async (catId, idx, itemId) => {
+    try {
+      await window.Auth.del('/libreta/' + itemId);
+      const newCats = cats.map(c => c.id === catId ? { ...c, items: c.items.filter((_, i) => i !== idx), count: c.count - 1 } : c);
+      setCats(newCats);
+      if (catId === 'alergias') syncAlergias(newCats);
+    } catch (e) { console.error('Error eliminando:', e); }
     setEditModal(null);
   };
 
@@ -3101,81 +3458,78 @@ const LibretaView = () => {
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 18px', background: 'white', border: '1px solid #EFEAEE', borderRadius: 12 }}>
         <PetAvatar pet={pet} size={44} />
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 16, fontWeight: 700 }}>{pet?.name} <span style={{ color: '#888', fontWeight: 500, fontSize: 14 }}>· {owner?.name}</span></div>
-          <div style={{ fontSize: 12, color: '#888' }}>{pet?.species} · {pet?.breed} · {pet?.weight}kg · Chip: {pet?.chip} · Tel. {owner?.phone}</div>
+          <div style={{ fontSize: 16, fontWeight: 700 }}>{pet?.name || 'Seleccioná un paciente'} <span style={{ color: '#888', fontWeight: 500, fontSize: 14 }}>{owner ? `· ${owner.name}` : ''}</span></div>
+          <div style={{ fontSize: 12, color: '#888' }}>{pet ? `${pet.species || ''} · ${pet.breed || ''} · ${pet.weight || 0}kg` : 'Usá el selector para elegir un paciente'}</div>
         </div>
-        <select value={petId} onChange={(e) => setPetId(+e.target.value)} style={{ height: 36, padding: '0 32px 0 12px', borderRadius: 8, border: '1px solid #E0DCE0', fontSize: 13, fontFamily: 'inherit', cursor: 'pointer', outline: 'none' }}>
-          {PETS.map(p => {
-            const o = CLIENTS.find(c => c.id === p.ownerId);
-            return <option key={p.id} value={p.id}>{p.name} — {o?.name}</option>;
-          })}
-        </select>
+        {PetSearchPicker && <PetSearchPicker petId={petId} onSelect={(id) => { window._LIBRETA_PET_ID = id; setPetId(id); }} />}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
-        {cats.map(cat => {
-          const I = cat.icon;
-          const isOpen = open === cat.id;
-          return (
-            <div key={cat.id} onClick={() => setOpen(cat.id)} style={{
-              background: 'white', borderRadius: 12, padding: 16, cursor: 'pointer',
-              border: `1px solid ${isOpen ? cat.color : '#EFEAEE'}`,
-              boxShadow: isOpen ? `0 4px 16px ${cat.color}1a` : 'none',
-              transition: 'all .15s',
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                <div style={{ width: 38, height: 38, borderRadius: 10, background: cat.color + '14', color: cat.color, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><I size={18} /></div>
-                <div style={{ fontSize: 22, fontWeight: 800, color: '#1A1A1A' }}>{cat.count}</div>
-              </div>
-              <div style={{ fontSize: 14, fontWeight: 700 }}>{cat.label}</div>
-              <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>
-                {cat.count === 0 ? 'Sin registros' : `${cat.count} ${cat.count === 1 ? 'registro' : 'registros'}`}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Open category detail */}
-      {(() => {
-        const cat = cats.find(c => c.id === open);
-        const I = cat.icon;
-        return (
-          <div style={{ background: 'white', border: '1px solid #EFEAEE', borderRadius: 12, padding: 20 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div style={{ width: 32, height: 32, borderRadius: 8, background: cat.color + '14', color: cat.color, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><I size={16} /></div>
-                <div style={{ fontSize: 15, fontWeight: 700 }}>{cat.label}</div>
-              </div>
-              <Btn size="sm" icon={<IconPlus />} onClick={() => { setFormData({ name: '', date: new Date().toISOString().slice(0,10), proxima: '', status: 'vigente' }); setAddModal({ catId: cat.id, catLabel: cat.label, catColor: cat.color }); }}>Agregar</Btn>
-            </div>
-            {cat.items.length === 0 ? (
-              <div style={{ padding: '32px 0', textAlign: 'center', color: '#888', fontSize: 13 }}>Sin registros para esta categoría</div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {cat.items.map((it, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '12px 14px', background: '#FAFAF8', borderRadius: 10 }}>
-                    <div style={{ width: 6, height: 36, borderRadius: 4, background: cat.color }} />
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 13.5, fontWeight: 600 }}>{it.name}</div>
-                      <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>
-                        Aplicado: {it.date}{it.proxima ? ` · Próxima: ${it.proxima}` : ''}
-                      </div>
-                    </div>
-                    <Pill color={it.status === 'vigente' || it.status === 'normal' || it.status === 'completada' || it.status === 'activa' ? '#1F8A5B' : it.status === 'proxima' ? '#D97706' : it.status === 'vencido' ? '#C2185B' : '#888'}>
-                      {it.status}
-                    </Pill>
-                    <button onClick={() => { setFormData({...it}); setEditModal({ catId: cat.id, catLabel: cat.label, catColor: cat.color, idx: i }); }} style={{ background: 'transparent', border: '1px solid #EFEAEE', borderRadius: 6, color: '#666', cursor: 'pointer', padding: 6, display: 'flex' }}><IconEdit size={14} /></button>
-                    <button onClick={() => handleDeleteItem(cat.id, i)} style={{ background: 'transparent', border: '1px solid #F2D5E2', borderRadius: 6, color: '#C2185B', cursor: 'pointer', padding: 6, display: 'flex' }}><IconTrash size={14} /></button>
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: 40, color: '#888', fontSize: 13 }}>Cargando libreta...</div>
+      ) : !petId ? (
+        <div style={{ textAlign: 'center', padding: 40, color: '#888', fontSize: 13 }}>Seleccioná un paciente para ver su libreta sanitaria.</div>
+      ) : (
+        <>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
+            {cats.map(cat => {
+              const I = cat.icon;
+              const isOpen = open === cat.id;
+              return (
+                <div key={cat.id} onClick={() => setOpen(cat.id)} style={{
+                  background: 'white', borderRadius: 12, padding: 16, cursor: 'pointer',
+                  border: `1px solid ${isOpen ? cat.color : '#EFEAEE'}`,
+                  boxShadow: isOpen ? `0 4px 16px ${cat.color}1a` : 'none',
+                  transition: 'all .15s',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                    <div style={{ width: 38, height: 38, borderRadius: 10, background: cat.color + '14', color: cat.color, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><I size={18} /></div>
+                    <div style={{ fontSize: 22, fontWeight: 800, color: '#1A1A1A' }}>{cat.count}</div>
                   </div>
-                ))}
-              </div>
-            )}
+                  <div style={{ fontSize: 14, fontWeight: 700 }}>{cat.label}</div>
+                  <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>{cat.count === 0 ? 'Sin registros' : `${cat.count} ${cat.count === 1 ? 'registro' : 'registros'}`}</div>
+                </div>
+              );
+            })}
           </div>
-        );
-      })()}
 
-      {/* Add modal */}
+          {(() => {
+            const cat = cats.find(c => c.id === open);
+            const I = cat.icon;
+            return (
+              <div style={{ background: 'white', border: '1px solid #EFEAEE', borderRadius: 12, padding: 20 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div style={{ width: 32, height: 32, borderRadius: 8, background: cat.color + '14', color: cat.color, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><I size={16} /></div>
+                    <div style={{ fontSize: 15, fontWeight: 700 }}>{cat.label}</div>
+                  </div>
+                  <Btn size="sm" icon={<IconPlus />} onClick={() => { setFormData({ name: '', date: window.todayAR ? window.todayAR() : new Date().toISOString().slice(0,10), proxima: '', status: 'vigente' }); setAddModal({ catId: cat.id, catLabel: cat.label, catColor: cat.color }); }}>Agregar</Btn>
+                </div>
+                {cat.items.length === 0 ? (
+                  <div style={{ padding: '32px 0', textAlign: 'center', color: '#888', fontSize: 13 }}>Sin registros para esta categoría</div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {cat.items.map((it, i) => (
+                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '12px 14px', background: '#FAFAF8', borderRadius: 10 }}>
+                        <div style={{ width: 6, height: 36, borderRadius: 4, background: cat.color }} />
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 13.5, fontWeight: 600 }}>{it.name}</div>
+                          <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>{it.date ? `Fecha: ${it.date}` : ''}{it.proxima ? ` · Próxima: ${it.proxima}` : ''}</div>
+                        </div>
+                        <Pill color={it.status === 'vigente' || it.status === 'normal' || it.status === 'completada' || it.status === 'activa' ? '#1F8A5B' : it.status === 'proxima' ? '#D97706' : it.status === 'vencido' || it.status === 'vencida' ? '#C2185B' : '#888'}>
+                          {it.status}
+                        </Pill>
+                        <button onClick={() => { setFormData({...it}); setEditModal({ catId: cat.id, catLabel: cat.label, catColor: cat.color, idx: i, itemId: it._id }); }} style={{ background: 'transparent', border: '1px solid #EFEAEE', borderRadius: 6, color: '#666', cursor: 'pointer', padding: 6, display: 'flex' }}><IconEdit size={14} /></button>
+                        <button onClick={() => handleDeleteItem(cat.id, i, it._id)} style={{ background: 'transparent', border: '1px solid #F2D5E2', borderRadius: 6, color: '#C2185B', cursor: 'pointer', padding: 6, display: 'flex' }}><IconTrash size={14} /></button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+        </>
+      )}
+
       {addModal && formData && (
         <Modal open={true} onClose={() => { setAddModal(null); setFormData(null); }} title={`Agregar · ${addModal.catLabel}`} width={460}
           footer={<><Btn variant="ghost" onClick={() => { setAddModal(null); setFormData(null); }}>Cancelar</Btn><Btn variant="primary" icon={<IconCheck />} onClick={handleAddItem} disabled={!formData.name}>Guardar</Btn></>}>
@@ -3183,11 +3537,10 @@ const LibretaView = () => {
         </Modal>
       )}
 
-      {/* Edit modal */}
       {editModal && formData && (
         <Modal open={true} onClose={() => { setEditModal(null); setFormData(null); }} title={`Editar · ${editModal.catLabel}`} width={460}
           footer={<>
-            <Btn variant="danger" icon={<IconTrash />} onClick={() => handleDeleteItem(editModal.catId, editModal.idx)} style={{ marginRight: 'auto' }}>Eliminar</Btn>
+            <Btn variant="danger" icon={<IconTrash />} onClick={() => handleDeleteItem(editModal.catId, editModal.idx, editModal.itemId)} style={{ marginRight: 'auto' }}>Eliminar</Btn>
             <Btn variant="ghost" onClick={() => { setEditModal(null); setFormData(null); }}>Cancelar</Btn>
             <Btn variant="primary" icon={<IconCheck />} onClick={handleEditItem} disabled={!formData.name}>Guardar</Btn>
           </>}>
@@ -3215,7 +3568,7 @@ const LibretaForm = ({ catId, catColor, data, onChange }) => {
       </Field>
       <div style={{ display: 'grid', gridTemplateColumns: needsProxima ? '1fr 1fr' : '1fr', gap: 10 }}>
         <Field label="Fecha"><Input type="date" value={data.date || ''} onChange={(e) => onChange({...data, date: e.target.value})} /></Field>
-        {needsProxima && <Field label="Próxima"><Input type="date" value={data.proxima || ''} onChange={(e) => onChange({...data, proxima: e.target.value})} /></Field>}
+        {needsProxima && <Field label="Próxima (opcional)"><Input type="date" value={data.proxima || ''} onChange={(e) => onChange({...data, proxima: e.target.value || null})} /></Field>}
       </div>
       <Field label="Estado">
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
@@ -3425,28 +3778,23 @@ window.MensajesView = MensajesView;
 // Agenda - Google Calendar style with drag-and-drop
 const HOURS = Array.from({ length: 12 }, (_, i) => 8 + i); // 8..19
 const DAYS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
-const DAY_NUMS = [4, 5, 6, 7, 8, 9, 10];
-const TODAY_IDX = 2; // Wed
-
-const WEEK_TURNOS = [
-  { id: 1, day: 0, time: 9, dur: 0.5, petId: 6, motivo: 'Vacuna', vet: 'P. Balbi', color: '#A3007B' },
-  { id: 2, day: 0, time: 10.5, dur: 1, petId: 4, motivo: 'Control', vet: 'P. Balbi', color: '#A3007B' },
-  { id: 3, day: 0, time: 14, dur: 0.5, petId: 7, motivo: 'Dermatología', vet: 'C. Méndez', color: '#1F8A5B' },
-  { id: 4, day: 1, time: 11, dur: 1.5, petId: 3, motivo: 'Cirugía', vet: 'P. Balbi', color: '#A3007B' },
-  { id: 5, day: 1, time: 16, dur: 0.5, petId: 10, motivo: 'Consulta', vet: 'C. Méndez', color: '#1F8A5B' },
-  { id: 6, day: 2, time: 9, dur: 0.5, petId: 4, motivo: 'Vacunación', vet: 'P. Balbi', color: '#A3007B' },
-  { id: 7, day: 2, time: 9.5, dur: 0.5, petId: 7, motivo: 'Post-quirúrgico', vet: 'C. Méndez', color: '#1F8A5B' },
-  { id: 8, day: 2, time: 10.5, dur: 1, petId: 1, motivo: 'Control anual', vet: 'P. Balbi', color: '#A3007B' },
-  { id: 9, day: 2, time: 12, dur: 0.5, petId: 6, motivo: 'Desparasit.', vet: 'P. Balbi', color: '#A3007B' },
-  { id: 10, day: 2, time: 14, dur: 0.75, petId: 11, motivo: 'Limpieza dental', vet: 'C. Méndez', color: '#1F8A5B' },
-  { id: 11, day: 2, time: 15.5, dur: 0.5, petId: 10, motivo: 'Dermatología', vet: 'P. Balbi', color: '#A3007B' },
-  { id: 12, day: 2, time: 17, dur: 0.5, petId: 12, motivo: '1ra cachorro', vet: 'P. Balbi', color: '#A3007B' },
-  { id: 13, day: 3, time: 10, dur: 0.5, petId: 2, motivo: 'Control', vet: 'C. Méndez', color: '#1F8A5B' },
-  { id: 14, day: 3, time: 15, dur: 1, petId: 9, motivo: 'Internación', vet: 'P. Balbi', color: '#A3007B' },
-  { id: 15, day: 4, time: 11, dur: 0.5, petId: 5, motivo: 'Consulta', vet: 'P. Balbi', color: '#A3007B' },
-  { id: 16, day: 4, time: 17, dur: 0.5, petId: 8, motivo: 'Aves', vet: 'C. Méndez', color: '#1F8A5B' },
-  { id: 17, day: 5, time: 10, dur: 1, petId: 2, motivo: 'Limpieza', vet: 'P. Balbi', color: '#A3007B' },
-];
+// Semana dinámica basada en la fecha actual (Argentina UTC-3)
+function getWeekDates() {
+  const todayStr = window.todayAR ? window.todayAR() : new Date().toISOString().slice(0, 10);
+  const todayUTC = new Date(todayStr + 'T00:00:00Z');
+  const dow = todayUTC.getUTCDay();
+  const monday = new Date(todayUTC);
+  monday.setUTCDate(todayUTC.getUTCDate() - (dow === 0 ? 6 : dow - 1));
+  return Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(monday);
+    d.setUTCDate(monday.getUTCDate() + i);
+    return d.toISOString().slice(0, 10);
+  });
+}
+const _WEEK_DATES = getWeekDates();
+const DAY_NUMS = _WEEK_DATES.map(d => parseInt(d.slice(8)));
+const TODAY_IDX = _WEEK_DATES.findIndex(d => d === (window.todayAR ? window.todayAR() : new Date().toISOString().slice(0, 10)));
+const WEEK_TURNOS = [];
 
 const NuevoTurnoModal = ({ onClose, onSave }) => {
   const [data, setData] = useState({ petId: PETS[0]?.id || 1, motivo: '', fecha: '2026-05-07', hora: '09:00', duracion: 30, vet: 'P. Balbi' });
@@ -3457,7 +3805,7 @@ const NuevoTurnoModal = ({ onClose, onSave }) => {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         <Field label="Paciente">
           <select value={data.petId} onChange={(e) => setData({...data, petId: +e.target.value})} style={selStyle}>
-            {PETS.map(p => { const o = CLIENTS.find(c => c.id === p.ownerId); return <option key={p.id} value={p.id}>{p.name} — {o?.name}</option>; })}
+            {PETS.map(p => { const o = (window.CLIENTS||[]).find(c => c.id === p.ownerId); return <option key={p.id} value={p.id}>{p.name} — {o?.name}</option>; })}
           </select>
         </Field>
         <Field label="Motivo">
@@ -3490,7 +3838,38 @@ const AgendaView = () => {
   const [hover, setHover] = useState(null);
   const [selected, setSelected] = useState(null);
   const [nuevoTurno, setNuevoTurno] = useState(false);
+  const [gcalToken, setGcalToken] = useState(null);
+  const [showGCalConfig, setShowGCalConfig] = useState(false);
+  const [calSyncMsg, setCalSyncMsg] = useState('');
 
+
+  // Carga turnos desde la API al montar
+  useEffect(() => {
+    window.Auth.get('/turnos').then(res => {
+      const raw = res.data || res || [];
+      const mapped = raw.map(t => {
+        const startDate = (t.horaInicio || '').slice(0, 10);
+        const dayIdx = _WEEK_DATES.indexOf(startDate);
+        if (dayIdx === -1) return null;
+        const start = new Date(t.horaInicio);
+        const end   = new Date(t.horaFin);
+        const time  = start.getHours() + start.getMinutes() / 60;
+        const dur   = Math.max(0.25, (end - start) / 3600000);
+        return {
+          id:     t.id,
+          day:    dayIdx,
+          time,
+          dur,
+          petId:  t.mascotaID,
+          motivo: t.notas || t.servicio?.nombre || 'Consulta',
+          vet:    t.profesional?.nombre || 'Dr. Balbi',
+          color:  t.profesional?.color  || '#A3007B',
+          fecha:  startDate,
+        };
+      }).filter(Boolean);
+      setTurnos(mapped);
+    }).catch(() => {});
+  }, []);
   const onDragStart = (t) => setDrag(t);
   const onDrop = (day, time) => {
     if (!drag) return;
@@ -3498,14 +3877,25 @@ const AgendaView = () => {
     setDrag(null); setHover(null);
   };
 
-  const addTurno = (data) => {
+  const addTurno = async (data) => {
     const [hStr, mStr] = data.hora.split(':');
     const timeNum = +hStr + (+mStr) / 60;
     const dayMap = { '2026-05-04': 0, '2026-05-05': 1, '2026-05-06': 2, '2026-05-07': 3, '2026-05-08': 4, '2026-05-09': 5, '2026-05-10': 6 };
     const dayIdx = dayMap[data.fecha] ?? 2;
     const vetColor = data.vet === 'P. Balbi' ? '#A3007B' : '#1F8A5B';
-    const newT = { id: Math.max(0, ...turnos.map(t => t.id)) + 1, day: dayIdx, time: timeNum, dur: data.duracion / 60, petId: data.petId, motivo: data.motivo, vet: data.vet, color: vetColor };
-    setTurnos([...turnos, newT]);
+    const newT = { id: Math.max(0, ...turnos.map(t => t.id)) + 1, day: dayIdx, time: timeNum, dur: data.duracion / 60, petId: data.petId, motivo: data.motivo, vet: data.vet, color: vetColor, fecha: data.fecha };
+    setTurnos(prev => [...prev, newT]);
+    if (gcalToken) {
+      try {
+        const pet = (window.PETS || []).find(p => p.id === data.petId);
+        const owner = (window.CLIENTS || []).find(c => c.id === pet?.ownerId);
+        await window.createCalEvent(gcalToken, newT, pet, owner);
+        setCalSyncMsg('Turno agregado a Google Calendar');
+      } catch {
+        setCalSyncMsg('Error al sincronizar con Calendar');
+      }
+      setTimeout(() => setCalSyncMsg(''), 3000);
+    }
   };
 
   const ROW_H = 56; // px per hour
@@ -3518,8 +3908,8 @@ const AgendaView = () => {
         <div style={{ fontSize: 13, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>Miércoles 6 de mayo — {hoy.length} turnos</div>
         {hoy.length === 0 && <div style={{ padding: '60px 0', textAlign: 'center', color: '#999', fontSize: 14 }}>Sin turnos para hoy</div>}
         {hoy.map(t => {
-          const pet = PETS.find(p => p.id === t.petId);
-          const owner = CLIENTS.find(c => c.id === pet?.ownerId);
+          const pet = (window.PETS||[]).find(p => p.id === t.petId);
+          const owner = (window.CLIENTS||[]).find(c => c.id === pet?.ownerId);
           const hH = Math.floor(t.time), hM = (t.time % 1) ? '30' : '00';
           return (
             <div key={t.id} onClick={() => setSelected(t)} style={{ display: 'flex', gap: 14, padding: '14px 18px', background: 'white', border: '1px solid #EFEAEE', borderRadius: 12, cursor: 'pointer', borderLeft: `4px solid ${t.color}` }}
@@ -3586,10 +3976,17 @@ const AgendaView = () => {
           <button style={{ width: 32, height: 32, border: '1px solid #E0DCE0', borderRadius: '0 8px 8px 0', background: 'white', cursor: 'pointer', color: '#555', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><IconChevron size={16} /></button>
         </div>
         <div style={{ fontSize: 17, fontWeight: 700 }}>Mayo 2026</div>
-        <Pill color="#1F8A5B" size="md">
-          <span style={{ width: 6, height: 6, background: '#1F8A5B', borderRadius: '50%', display: 'inline-block' }} />
-          <span style={{ marginLeft: 4 }}>Sincronizado con Google Calendar</span>
-        </Pill>
+        {gcalToken ? (
+          <Pill color="#1F8A5B" size="md">
+            <span style={{ width: 6, height: 6, background: '#1F8A5B', borderRadius: '50%', display: 'inline-block' }} />
+            <span style={{ marginLeft: 4 }}>{calSyncMsg || 'Conectado a Google Calendar'}</span>
+          </Pill>
+        ) : (
+          <button onClick={() => setShowGCalConfig(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', border: '1px solid #E0DCE0', borderRadius: 20, background: 'white', cursor: 'pointer', fontSize: 12, fontWeight: 600, color: '#555' }}>
+            <svg width="14" height="14" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+            Conectar Google Calendar
+          </button>
+        )}
         <div style={{ flex: 1 }} />
         <div style={{ display: 'flex', background: '#F4F0F2', padding: 3, borderRadius: 8 }}>
           {['día', 'semana', 'mes'].map(v => (
@@ -3660,8 +4057,8 @@ const AgendaView = () => {
               )}
               {/* Events */}
               {turnos.filter(t => t.day === dayIdx).map(t => {
-                const pet = PETS.find(p => p.id === t.petId);
-                const owner = CLIENTS.find(c => c.id === pet?.ownerId);
+                const pet = (window.PETS||[]).find(p => p.id === t.petId);
+                const owner = (window.CLIENTS||[]).find(c => c.id === pet?.ownerId);
                 const top = (t.time - HOURS[0]) * ROW_H;
                 const height = t.dur * ROW_H - 2;
                 return (
@@ -3690,8 +4087,8 @@ const AgendaView = () => {
 
       {/* Event details modal */}
       {selected && (() => {
-        const pet = PETS.find(p => p.id === selected.petId);
-        const owner = CLIENTS.find(c => c.id === pet?.ownerId);
+        const pet = (window.PETS||[]).find(p => p.id === selected.petId);
+        const owner = (window.CLIENTS||[]).find(c => c.id === pet?.ownerId);
         return (
           <div onClick={() => setSelected(null)} style={{ position: 'absolute', inset: 0, background: 'rgba(20,15,20,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}>
             <div onClick={(e) => e.stopPropagation()} style={{ width: 380, background: 'white', borderRadius: 14, overflow: 'hidden', boxShadow: '0 20px 50px rgba(0,0,0,0.2)' }}>
@@ -3721,6 +4118,7 @@ const AgendaView = () => {
         );
       })()}
 
+      {showGCalConfig && <window.GoogleConfigModal mode="calendar" onClose={() => setShowGCalConfig(false)} onConnected={(tok) => { setGcalToken(tok); setCalSyncMsg('Conectado'); setTimeout(() => setCalSyncMsg(''), 2000); }} />}
       {nuevoTurno && <NuevoTurnoModal onClose={() => setNuevoTurno(false)} onSave={addTurno} />}
     </div>
   );
@@ -3736,14 +4134,37 @@ window.AgendaView = AgendaView;
 // precios.jsx
 // Precios — productos editables con cálculo de margen + sync Sheets
 const Precios = () => {
-  const [products, setProducts] = useState(window.PRODUCTOS_INIT);
+  const [products, setProducts] = useState(() => window._PRECIOS_STATE || []);
   const [q, setQ] = useState('');
   const [cat, setCat] = useState('todos');
   const [editing, setEditing] = useState(null);
   const [saved, setSaved] = useState(null);
   const [showNew, setShowNew] = useState(false);
+  const [gsheetsToken, setGsheetsToken] = useState(null);
+  const [showSheetsConfig, setShowSheetsConfig] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [syncMsg, setSyncMsg] = useState('');
 
-  const cats = ['todos', ...Array.from(new Set(window.PRODUCTOS_INIT.map(p => p.categoria)))];
+  React.useEffect(() => { window._PRECIOS_STATE = products; }, [products]);
+
+  React.useEffect(() => {
+    if (!gsheetsToken) return;
+    const sheetId = window.GConf?.getSheetId();
+    if (!sheetId) return;
+    const timer = setTimeout(async () => {
+      setSyncing(true);
+      try {
+        await window.syncToSheets(gsheetsToken, sheetId, products);
+        setSyncMsg('Sincronizado hace un momento');
+      } catch {
+        setSyncMsg('Error al sincronizar');
+      }
+      setSyncing(false);
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, [products, gsheetsToken]);
+
+  const cats = ['todos', ...Array.from(new Set(products.map(p => p.categoria).filter(Boolean)))];
   const filtered = products.filter(p => (cat === 'todos' || p.categoria === cat) && p.nombre.toLowerCase().includes(q.toLowerCase()));
 
   const margin = (costo, venta) => {
@@ -3779,13 +4200,29 @@ const Precios = () => {
           <svg width="20" height="20" viewBox="0 0 48 48"><path fill="#0F9D58" d="M37 4H11a3 3 0 00-3 3v34a3 3 0 003 3h26a3 3 0 003-3V7a3 3 0 00-3-3z"/><path fill="white" d="M14 14h20v3H14zM14 19h20v3H14zM14 24h20v3H14zM14 29h20v3H14zM14 34h20v3H14zM21 14h2v23h-2zM27 14h2v23h-2z"/></svg>
         </div>
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 13.5, fontWeight: 700, color: '#1A1A1A' }}>Sincronizado con Google Sheets</div>
-          <div style={{ fontSize: 11.5, color: '#888', marginTop: 1 }}>
-            Planilla: <strong>Dr. Balbi · Listado de Precios 2026</strong> · Última sincronización hace 12 segundos
-          </div>
+          {gsheetsToken ? (
+            <>
+              <div style={{ fontSize: 13.5, fontWeight: 700, color: '#1A1A1A' }}>{syncing ? 'Sincronizando…' : 'Conectado a Google Sheets'}</div>
+              <div style={{ fontSize: 11.5, color: '#888', marginTop: 1 }}>{syncMsg || 'Los cambios se sincronizan automáticamente'}</div>
+            </>
+          ) : (
+            <>
+              <div style={{ fontSize: 13.5, fontWeight: 700, color: '#1A1A1A' }}>Conectar con Google Sheets</div>
+              <div style={{ fontSize: 11.5, color: '#888', marginTop: 1 }}>Los precios se sincronizarán automáticamente al cambiar</div>
+            </>
+          )}
         </div>
-        <Btn variant="secondary" size="sm" icon={<IconCheck />}>Abrir en Sheets</Btn>
-        <Btn variant="soft" size="sm">Sincronizar ahora</Btn>
+        {gsheetsToken ? (
+          <>
+            <Btn variant="secondary" size="sm" icon={<IconCheck />} onClick={() => { const id = window.GConf?.getSheetId(); if (id) window.open(`https://docs.google.com/spreadsheets/d/${id}`, '_blank'); }}>Abrir en Sheets</Btn>
+            <Btn variant="soft" size="sm" onClick={async () => { const id = window.GConf?.getSheetId(); if (!id) return; setSyncing(true); try { await window.syncToSheets(gsheetsToken, id, products); setSyncMsg('Sincronizado ahora'); } catch { setSyncMsg('Error al sincronizar'); } setSyncing(false); setTimeout(() => setSyncMsg(''), 3000); }}>{syncing ? 'Sincronizando…' : 'Sincronizar ahora'}</Btn>
+          </>
+        ) : (
+          <button onClick={() => setShowSheetsConfig(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', border: '1px solid #E0DCE0', borderRadius: 8, background: 'white', cursor: 'pointer', fontSize: 12, fontWeight: 600, color: '#555' }}>
+            <svg width="14" height="14" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+            Conectar con Google
+          </button>
+        )}
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
@@ -3846,6 +4283,7 @@ const Precios = () => {
         })}
       </div>
 
+      {showSheetsConfig && <window.GoogleConfigModal mode="sheets" onClose={() => setShowSheetsConfig(false)} onConnected={(tok) => { setGsheetsToken(tok); setSyncMsg('Conectado — sincronizando…'); }} />}
       {showNew && <NewProductModal onClose={() => setShowNew(false)} onSave={addNew} cats={cats.filter(c => c !== 'todos')} />}
     </div>
   );
@@ -3939,6 +4377,282 @@ window.Precios = Precios;
 
 
 <script type="text/babel">
+// ============================================================
+// GOOGLE INTEGRATION — Calendar + Sheets
+// ============================================================
+
+// Mapeo índice de día → fecha real de la semana mostrada en la agenda
+const GCAL_DAY_DATES = _WEEK_DATES;
+
+// Config persistida en localStorage
+const GConf = {
+  getClientId:    () => localStorage.getItem('balbi_gclient_id') || '',
+  setClientId:    (v) => localStorage.setItem('balbi_gclient_id', v),
+  getSheetId:     () => localStorage.getItem('balbi_gsheet_id') || '',
+  setSheetId:     (v) => localStorage.setItem('balbi_gsheet_id', v),
+  parseSheetId:   (s) => { const m = (s||'').match(/\/d\/([a-zA-Z0-9_-]+)/); return m ? m[1] : s; },
+  getSheetRawUrl: () => localStorage.getItem('balbi_gsheet_url') || '',
+  setSheetRawUrl: (v) => localStorage.setItem('balbi_gsheet_url', v),
+};
+window.GConf = GConf;
+
+// Carga el script de Google Identity Services una sola vez
+let _gisLoadPromise = null;
+const ensureGIS = () => {
+  if (window.google && window.google.accounts) return Promise.resolve();
+  if (_gisLoadPromise) return _gisLoadPromise;
+  _gisLoadPromise = new Promise((resolve) => {
+    const s = document.createElement('script');
+    s.src = 'https://accounts.google.com/gsi/client';
+    s.onload = resolve;
+    s.onerror = () => { _gisLoadPromise = null; resolve(); };
+    document.head.appendChild(s);
+  });
+  return _gisLoadPromise;
+};
+
+// Solicita un token OAuth para el scope dado (abre popup de Google)
+const requestGToken = async (scope) => {
+  const clientId = GConf.getClientId();
+  if (!clientId) throw new Error('Ingresá el Client ID de Google primero.');
+  await ensureGIS();
+  if (!window.google || !window.google.accounts) throw new Error('No se pudo cargar Google Identity Services. Verificá tu conexión.');
+  return new Promise((resolve, reject) => {
+    const tc = window.google.accounts.oauth2.initTokenClient({
+      client_id: clientId,
+      scope,
+      callback: (r) => r.error
+        ? reject(new Error(r.error_description || r.error))
+        : resolve(r.access_token),
+    });
+    tc.requestAccessToken({ prompt: '' });
+  });
+};
+window.requestGToken = requestGToken;
+
+// ---- Google Calendar API ----
+const createCalEvent = async (token, turno, pet, owner) => {
+  const date  = GCAL_DAY_DATES[turno.day] || GCAL_DAY_DATES[2];
+  const pad   = (n) => String(Math.floor(n)).padStart(2, '0');
+  const hh    = Math.floor(turno.time);
+  const mm    = (turno.time % 1) ? 30 : 0;
+  const endMin = mm + Math.round(turno.dur * 60);
+  const endHh  = hh + Math.floor(endMin / 60);
+  const endMm  = endMin % 60;
+  const tz = 'America/Argentina/Buenos_Aires';
+
+  const body = {
+    summary: `${turno.motivo} — ${pet?.name || 'Paciente'}`,
+    description: [
+      pet   ? `Paciente: ${pet.name} (${pet.species} · ${pet.breed})` : '',
+      owner ? `Dueño/a: ${owner.name} · ${owner.phone}` : '',
+      `Profesional: ${turno.vet}`,
+    ].filter(Boolean).join('\n'),
+    start: { dateTime: `${date}T${pad(hh)}:${pad(mm)}:00`, timeZone: tz },
+    end:   { dateTime: `${date}T${pad(endHh)}:${pad(endMm)}:00`, timeZone: tz },
+  };
+
+  const r = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) { const e = await r.json(); throw new Error(e.error?.message || 'Error Calendar API'); }
+  return r.json();
+};
+window.createCalEvent = createCalEvent;
+
+// ---- Google Sheets API ----
+const SHEETS_HEADER = ['Categoría','Nombre','Costo','Precio Venta','Margen %','Stock','Unidad','Proveedor'];
+
+const syncToSheets = async (token, sheetId, products) => {
+  const marg = (c, v) => c > 0 ? ((v - c) / c * 100).toFixed(1) + '%' : '';
+  const values = [
+    SHEETS_HEADER,
+    ...products.map(p => [
+      p.categoria, p.nombre, p.costo ?? 0, p.venta ?? 0,
+      marg(p.costo, p.venta), p.stock ?? '', p.unidad ?? '', p.proveedor ?? '',
+    ]),
+  ];
+  const r = await fetch(
+    `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/Precios!A1?valueInputOption=USER_ENTERED`,
+    {
+      method: 'PUT',
+      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ values }),
+    }
+  );
+  if (!r.ok) { const e = await r.json(); throw new Error(e.error?.message || 'Error Sheets API'); }
+  return r.json();
+};
+window.syncToSheets = syncToSheets;
+
+// ---- Modal de configuración compartido ----
+const GoogleConfigModal = ({ mode, onClose, onConnected }) => {
+  const isSheets = mode === 'sheets';
+  const scope = isSheets
+    ? 'https://www.googleapis.com/auth/spreadsheets'
+    : 'https://www.googleapis.com/auth/calendar.events';
+
+  const [clientId,  setClientId]  = React.useState(GConf.getClientId());
+  const [sheetUrl,  setSheetUrl]  = React.useState(GConf.getSheetRawUrl());
+  const [loading,   setLoading]   = React.useState(false);
+  const [err,       setErr]       = React.useState('');
+
+  const handleConnect = async () => {
+    if (!clientId.trim()) { setErr('Ingresá el Client ID.'); return; }
+    if (isSheets && !sheetUrl.trim()) { setErr('Ingresá la URL de la planilla.'); return; }
+    setLoading(true); setErr('');
+    GConf.setClientId(clientId.trim());
+    if (isSheets) {
+      GConf.setSheetRawUrl(sheetUrl.trim());
+      GConf.setSheetId(GConf.parseSheetId(sheetUrl.trim()));
+    }
+    try {
+      const token = await requestGToken(scope);
+      onConnected(token);
+      onClose();
+    } catch (e) {
+      setErr(e.message || 'Error al autenticar con Google.');
+    } finally { setLoading(false); }
+  };
+
+  const labelStep = (n, txt) => (
+    <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+      <div style={{ width: 20, height: 20, borderRadius: '50%', background: '#E0D9F0', color: '#7A3FBF', fontSize: 11, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 }}>{n}</div>
+      <div style={{ fontSize: 12.5, color: '#444', lineHeight: 1.6 }}>{txt}</div>
+    </div>
+  );
+
+  return (
+    <Modal open={true} onClose={onClose}
+      title={isSheets ? 'Conectar Google Sheets' : 'Conectar Google Calendar'}
+      width={520}
+      footer={<>
+        <Btn variant="ghost" onClick={onClose}>Cancelar</Btn>
+        <Btn variant="primary" icon={<IconCheck />} onClick={handleConnect} disabled={loading}>
+          {loading ? 'Conectando…' : 'Autorizar con Google'}
+        </Btn>
+      </>}
+    >
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div style={{ padding: 14, background: '#F5F3FF', border: '1px solid #DDD6FE', borderRadius: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#7A3FBF', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 2 }}>Cómo configurar</div>
+          {labelStep(1, <span>Entrá a <strong>console.cloud.google.com</strong> → <em>APIs y servicios</em> → Biblioteca</span>)}
+          {labelStep(2, <span>Habilitá la API de <strong>{isSheets ? 'Google Sheets' : 'Google Calendar'}</strong></span>)}
+          {labelStep(3, <span>Credenciales → <em>Crear credencial</em> → <em>ID de cliente OAuth 2.0</em> → Aplicación web</span>)}
+          {labelStep(4, <span>En "Orígenes autorizados" agregá <code style={{ background: 'rgba(0,0,0,0.06)', padding: '1px 5px', borderRadius: 3, fontFamily: 'monospace' }}>http://localhost:3000</code></span>)}
+          {labelStep(5, <span>Copiá el <strong>Client ID</strong> y pegalo abajo</span>)}
+        </div>
+
+        <Field label="Google OAuth Client ID">
+          <Input
+            placeholder="123456789-abc...apps.googleusercontent.com"
+            value={clientId}
+            onChange={(e) => setClientId(e.target.value)}
+          />
+        </Field>
+
+        {isSheets && (
+          <Field label="URL de la planilla de Google Sheets">
+            <Input
+              placeholder="https://docs.google.com/spreadsheets/d/TU_ID_AQUI/..."
+              value={sheetUrl}
+              onChange={(e) => setSheetUrl(e.target.value)}
+            />
+            <div style={{ fontSize: 11, color: '#888', marginTop: 4 }}>
+              La planilla debe tener una hoja llamada <strong>Precios</strong>. Si no existe, se escribe en la primera hoja.
+            </div>
+          </Field>
+        )}
+
+        {err && (
+          <div style={{ fontSize: 12.5, color: '#C2185B', background: '#FFF0F4', padding: '10px 12px', borderRadius: 8, border: '1px solid #F2D5E2' }}>
+            {err}
+          </div>
+        )}
+      </div>
+    </Modal>
+  );
+};
+
+window.GoogleConfigModal = GoogleConfigModal;
+</script>
+
+
+<script type="text/babel">
+// configuracion.jsx — Gestión de usuarios y roles (solo admin)
+const ConfiguracionView = ({ currentUser }) => {
+  const [usuarios, setUsuarios] = React.useState([]);
+  const [roles, setRoles] = React.useState([]);
+  const [saving, setSaving] = React.useState(null);
+  const [msg, setMsg] = React.useState('');
+
+  React.useEffect(() => {
+    window.Auth.get('/usuarios').then(setUsuarios).catch(() => {});
+    window.Auth.get('/roles').then(setRoles).catch(() => {});
+  }, []);
+
+  const asignarRol = async (usuarioId, rolID) => {
+    setSaving(usuarioId);
+    try {
+      await window.Auth.put(`/usuarios/${usuarioId}/roles`, { rolID: parseInt(rolID) });
+      setMsg('Rol actualizado');
+      setTimeout(() => setMsg(''), 2500);
+    } catch { setMsg('Error al guardar'); }
+    setSaving(null);
+  };
+
+  const ROL_COLOR = { admin: '#A3007B', veterinario: '#1F8A5B', recepcion: '#D97706' };
+
+  return (
+    <div style={{ padding: 28, flex: 1, overflow: 'auto' }}>
+      <div style={{ maxWidth: 760 }}>
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ fontSize: 16, fontWeight: 700 }}>Usuarios y Roles</div>
+          <div style={{ fontSize: 13, color: '#888', marginTop: 4 }}>Asigná roles para controlar qué módulos puede ver cada usuario.</div>
+        </div>
+        {msg && <div style={{ marginBottom: 14, padding: '10px 14px', background: '#E8F5EE', borderRadius: 8, fontSize: 13, color: '#1F8A5B', fontWeight: 600 }}>{msg}</div>}
+        <div style={{ background: 'white', border: '1px solid #EFEAEE', borderRadius: 12, overflow: 'hidden' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 160px', padding: '10px 16px', background: '#FAFAF8', fontSize: 11, fontWeight: 700, color: '#666', letterSpacing: 0.4, textTransform: 'uppercase', borderBottom: '1px solid #EFEAEE' }}>
+            <div>Usuario</div><div>Email</div><div>Rol</div>
+          </div>
+          {usuarios.map(u => (
+            <div key={u.id} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 160px', padding: '12px 16px', borderBottom: '1px solid #F4F0F2', alignItems: 'center', fontSize: 13 }}>
+              <div style={{ fontWeight: 600 }}>{u.nombre}</div>
+              <div style={{ color: '#666', fontSize: 12 }}>{u.email}</div>
+              <select
+                defaultValue=""
+                onChange={(e) => { if (e.target.value) asignarRol(u.id, e.target.value); }}
+                disabled={saving === u.id || u.id === currentUser?.id}
+                style={{ height: 34, padding: '0 10px', borderRadius: 8, border: '1px solid #E0DCE0', fontSize: 12, fontFamily: 'inherit', outline: 'none', background: 'white', cursor: 'pointer' }}>
+                <option value="" disabled>{saving === u.id ? 'Guardando…' : 'Cambiar rol…'}</option>
+                {roles.map(r => <option key={r.id} value={r.id}>{r.nombre}</option>)}
+              </select>
+            </div>
+          ))}
+          {usuarios.length === 0 && <div style={{ padding: '28px 16px', textAlign: 'center', color: '#999', fontSize: 13 }}>No hay usuarios registrados</div>}
+        </div>
+        <div style={{ marginTop: 28, padding: '16px 20px', background: '#FAF1F7', borderRadius: 12, border: '1px solid #E5C5DC' }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#A3007B', marginBottom: 8 }}>Permisos por rol</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, fontSize: 12 }}>
+            {Object.entries({ admin: ['Todo el sistema + Configuración'], veterinario: ['Dashboard, Agenda, Pacientes,', 'Consultas, Libreta, Internación,', 'Mensajes'], recepcion: ['Dashboard, Agenda,', 'Clientes, Mensajes'] }).map(([rol, lines]) => (
+              <div key={rol} style={{ padding: '12px 14px', background: 'white', borderRadius: 8, borderLeft: `3px solid ${ROL_COLOR[rol] || '#888'}` }}>
+                <div style={{ fontWeight: 700, color: ROL_COLOR[rol] || '#888', textTransform: 'capitalize', marginBottom: 4 }}>{rol}</div>
+                {lines.map((l, i) => <div key={i} style={{ color: '#555' }}>{l}</div>)}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+window.ConfiguracionView = ConfiguracionView;
+</script>
+
+
+<script type="text/babel">
 // Main App — composes all modules
 const { useState, useEffect } = React;
 
@@ -4011,6 +4725,37 @@ const App = () => {
   const [newConsulta, setNewConsulta] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [mensajeClientId, setMensajeClientId] = useState(null);
+  const [newClienteModal, setNewClienteModal] = useState(false);
+  const [newPacienteModal, setNewPacienteModal] = useState(false);
+  const [refreshTick, setRefreshTick] = useState(0);
+  const [msgBadge, setMsgBadge] = useState(0);
+  const [currentUser] = useState(() => window.Auth.getUser());
+
+  // Protección de rutas por rol
+  const safeSetActive = (id) => {
+    const rol = currentUser.rol || window.Auth.getRole();
+    if (window.canAccess(rol, id)) setActive(id);
+  };
+
+  // WebSocket — notificaciones de mensajes en tiempo real
+  useEffect(() => {
+    if (!loggedIn) return;
+    const wsUrl = API_BASE.replace(/^http/, 'ws').replace('/api', '') + '/ws';
+    let ws;
+    try {
+      ws = new WebSocket(wsUrl);
+      ws.onmessage = (e) => {
+        try {
+          const msg = JSON.parse(e.data);
+          if (msg.type === 'chat-nuevo-mensaje') {
+            setMsgBadge(prev => prev + 1);
+          }
+        } catch {}
+      };
+      ws.onerror = () => {};
+    } catch {}
+    return () => { try { ws?.close(); } catch {} };
+  }, [loggedIn]);
 
   useEffect(() => {
     if (loggedIn) {
@@ -4049,11 +4794,11 @@ const App = () => {
     mensajes: { title: 'Mensajes', breadcrumb: 'Comunicación' },
     internacion: { title: 'Internación', breadcrumb: 'Pacientes' },
     precios: { title: 'Precios', breadcrumb: 'Administración' },
+    configuracion: { title: 'Configuración', breadcrumb: 'Administración' },
   };
   const cur = titles[active];
 
-  const [newClienteModal, setNewClienteModal] = useState(false);
-  const [newPacienteModal, setNewPacienteModal] = useState(false);
+  const onAction = (a) => {
     if (a === 'consulta') setNewConsulta(true);
     if (a === 'search') setSearchOpen(true);
     if (a === 'internar') setActive('internacion');
@@ -4066,26 +4811,27 @@ const App = () => {
       fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif',
       position: 'relative',
     }}>
-      <Sidebar active={active} setActive={setActive} />
+      <Sidebar active={active} setActive={(id) => { if (id === 'mensajes') setMsgBadge(0); safeSetActive(id); }} msgBadge={msgBadge} currentUser={currentUser} />
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
         <ActionBar title={cur.title} breadcrumb={cur.breadcrumb} onAction={onAction} />
         {/* Page content */}
         {active === 'dashboard' && <Dashboard goTo={setActive} openSearch={() => setSearchOpen(true)} />}
         {active === 'agenda' && <AgendaView />}
-        {active === 'clientes' && <ClientesView loading={loading} openClient={(c) => setClientDrawer({ open: true, client: c })} openNew={() => setNewClienteModal(true)} />}
+        {active === 'clientes' && <ClientesView loading={loading} openClient={(c) => setClientDrawer({ open: true, client: c })} openNew={() => setNewClienteModal(true)} refreshTick={refreshTick} />}
         {active === 'pacientes' && <PacientesView loading={loading} openPet={(p) => setPetDrawer({ open: true, pet: p })} openNew={() => setNewPacienteModal(true)} />}
         {active === 'consultas' && <ConsultasView />}
         {active === 'libreta' && <LibretaView />}
         {active === 'mensajes' && <MensajesView initialClientId={mensajeClientId} />}
         {active === 'internacion' && <InternacionView />}
         {active === 'precios' && <Precios />}
+        {active === 'configuracion' && <window.ConfiguracionView currentUser={currentUser} />}
 
         {/* Drawers + modals (overlay this column only) */}
-        <ClientDrawer client={clientDrawer.client} open={clientDrawer.open} onClose={() => setClientDrawer({ ...clientDrawer, open: false })} goToPet={(p) => { setClientDrawer({ ...clientDrawer, open: false }); setPetDrawer({ open: true, pet: p }); }} goToMensajes={(c) => { const m = MENSAJES.find(msg => CLIENTS.find(cl => cl.id === msg.clientId)?.id === c.id); setMensajeClientId(m?.id || null); setActive('mensajes'); }} />
-        <PetDrawer pet={petDrawer.pet} open={petDrawer.open} onClose={() => setPetDrawer({ ...petDrawer, open: false })} goToConsultas={() => setActive('consultas')} goToLibreta={() => setActive('libreta')} />
+        <ClientDrawer client={clientDrawer.client} open={clientDrawer.open} onClose={() => setClientDrawer({ ...clientDrawer, open: false })} goToPet={(p) => { setClientDrawer({ ...clientDrawer, open: false }); setPetDrawer({ open: true, pet: p }); }} goToMensajes={(c) => { const m = MENSAJES.find(msg => CLIENTS.find(cl => cl.id === msg.clientId)?.id === c.id); setMensajeClientId(m?.id || null); setActive('mensajes'); }} onSaved={() => setRefreshTick(t => t + 1)} />
+        <PetDrawer pet={petDrawer.pet} open={petDrawer.open} onClose={() => setPetDrawer({ ...petDrawer, open: false })} goToConsultas={() => setActive('consultas')} goToLibreta={(p) => { window._LIBRETA_PET_ID = p?.id; setActive('libreta'); }} />
         <NewConsultaModal open={newConsulta} onClose={() => setNewConsulta(false)} />
         <QuickSearchModal open={searchOpen} onClose={() => setSearchOpen(false)} openClient={(c) => { setSearchOpen(false); setClientDrawer({ open: true, client: c }); }} openPet={(p) => { setSearchOpen(false); setPetDrawer({ open: true, pet: p }); }} />
-        {newClienteModal && <NuevoClienteModal onClose={() => setNewClienteModal(false)} onCreated={() => setNewClienteModal(false)} />}
+        {newClienteModal && <NuevoClienteModal onClose={() => setNewClienteModal(false)} onCreated={() => { setNewClienteModal(false); setRefreshTick(t => t + 1); }} />}
         {newPacienteModal && <NuevoPacienteModal onClose={() => setNewPacienteModal(false)} onCreated={() => setNewPacienteModal(false)} />}
       </div>
 
@@ -4141,7 +4887,7 @@ const QuickSearchModal = ({ open, onClose, openClient, openPet }) => {
             {results.pets.length > 0 && <>
               <div style={{ padding: '10px 18px 4px', fontSize: 11, color: '#888', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, borderTop: '1px solid #F4F0F2', marginTop: 6 }}>Pacientes</div>
               {results.pets.map(p => {
-                const o = CLIENTS.find(c => c.id === p.ownerId);
+                const o = (window.CLIENTS||[]).find(c => c.id === p.ownerId);
                 return (
                   <div key={p.id} onClick={() => openPet(p)} style={{ padding: '10px 18px', display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}
                     onMouseEnter={(e) => e.currentTarget.style.background = '#FAF1F7'}

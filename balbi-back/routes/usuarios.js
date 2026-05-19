@@ -14,4 +14,7 @@ router.put('/:id', usuariosController.actualizarUsuario);
 // GET /api/usuarios/:id/roles
 router.get('/:id/roles', usuariosController.obtenerRolesUsuario);
 
+// PUT /api/usuarios/:id/roles
+router.put('/:id/roles', usuariosController.asignarRol);
+
 module.exports = router;

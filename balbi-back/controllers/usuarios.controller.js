@@ -101,9 +101,34 @@ const obtenerRolesUsuario = async (req, res) => {
   }
 };
 
+// PUT /api/usuarios/:id/roles  — reemplaza el rol del usuario
+const asignarRol = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { rolID } = req.body;
+
+    if (!rolID) return res.status(400).json({ error: 'rolID es requerido' });
+
+    const usuario = await Usuario.findByPk(id);
+    if (!usuario) return res.status(404).json({ error: 'Usuario no encontrado' });
+
+    const rol = await Rol.findByPk(rolID);
+    if (!rol) return res.status(404).json({ error: 'Rol no encontrado' });
+
+    await UsuarioRol.destroy({ where: { usuarioID: id } });
+    await UsuarioRol.create({ usuarioID: id, rolID, estado: 'ACTIVO' });
+
+    res.json({ message: 'Rol asignado', rolNombre: rol.nombre.toLowerCase() });
+  } catch (error) {
+    console.error('Error asignando rol:', error);
+    res.status(500).json({ error: 'Error al asignar rol' });
+  }
+};
+
 module.exports = {
   listarUsuarios,
   obtenerUsuario,
   actualizarUsuario,
-  obtenerRolesUsuario
+  obtenerRolesUsuario,
+  asignarRol
 };

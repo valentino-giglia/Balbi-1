@@ -14,7 +14,7 @@ function parsePesoKg(v) {
 
 const listarConsultas = async (req, res) => {
   try {
-    const { turnoID } = req.query;
+    const { turnoID, mascotaID } = req.query;
     let where = {};
 
     if (turnoID) {
@@ -27,6 +27,10 @@ const listarConsultas = async (req, res) => {
       } else {
         return res.json([]);
       }
+    }
+
+    if (mascotaID) {
+      where.mascotaID = parseInt(mascotaID);
     }
 
     const consultas = await Consultas.findAll({
@@ -79,6 +83,8 @@ const crearConsulta = async (req, res) => {
       nota,
       extra,
       turnoID,
+      mascotaID,
+      vet,
       motivoConsulta,
       examenClinico,
       diagnostico,
@@ -89,6 +95,8 @@ const crearConsulta = async (req, res) => {
     const consulta = await Consultas.create({
       nota: nota || null,
       extra: extra || null,
+      mascotaID: mascotaID ? parseInt(mascotaID) : null,
+      vet: vet || null,
       motivoConsulta: nullIfEmptyText(motivoConsulta),
       examenClinico: nullIfEmptyText(examenClinico),
       diagnostico: nullIfEmptyText(diagnostico),
