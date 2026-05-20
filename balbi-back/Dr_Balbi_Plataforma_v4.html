@@ -1257,6 +1257,24 @@ const Dashboard = ({ goTo, openSearch }) => {
 
   // Persistir vets y guardias en localStorage
   useEffectD(() => { localStorage.setItem('balbi_guardia', JSON.stringify({ vets, guardias })); }, [vets, guardias]);
+
+  // Sincronizar vets desde API de profesionales
+  useEffectD(() => {
+    if (!window.Auth?.getToken()) return;
+    window.Auth.get('/profesionales?pageSize=100').then(res => {
+      const list = Array.isArray(res) ? res : (res.data || []);
+      if (list.length === 0) return;
+      const mapped = list.map(p => ({
+        id: p.id,
+        name: p.nombre,
+        role: p.codigo || '',
+        color: p.color || '#A3007B',
+        initials: p.nombre.split(' ').filter(Boolean).slice(0, 2).map(s => s[0]).join('').toUpperCase(),
+        phone: p.telefono || ''
+      }));
+      setVets(mapped);
+    }).catch(() => {});
+  }, []);
   useEffectD(() => { window._goTo = goTo; }, [goTo]);
   useEffectD(() => { const t = setInterval(() => setInternados(_boxesToInternados()), 2000); return () => clearInterval(t); }, []);
 
@@ -4572,7 +4590,8 @@ const Precios = () => {
     return () => clearTimeout(timer);
   }, [products, gsheetsToken]);
 
-  const cats = ['todos', ...Array.from(new Set(products.map(p => p.categoria).filter(Boolean)))];
+  const _configCats = (() => { try { return JSON.parse(localStorage.getItem('balbi_cats') || '[]'); } catch { return []; } })();
+  const cats = ['todos', ...Array.from(new Set([..._configCats, ...products.map(p => p.categoria).filter(Boolean)]))];
   const filtered = products.filter(p => (cat === 'todos' || p.categoria === cat) && p.nombre.toLowerCase().includes(q.toLowerCase()));
 
   const margin = (costo, venta) => {
@@ -5089,6 +5108,105 @@ const ConfiguracionView = ({ currentUser }) => {
     setEditHorario(null);
   };
 
+  // ── Equipo de veterinarios ──
+  const [profs, setProfs] = React.useState([]);
+  const [editProf, setEditProf] = React.useState(null);
+  const [showNuevoProf, setShowNuevoProf] = React.useState(false);
+  const [nuevoProf, setNuevoProf] = React.useState({ nombre: '', codigo: '', telefono: '', email: '', color: '#A3007B' });
+  const [savingProf, setSavingProf] = React.useState(false);
+  const [profsMsg, setProfsMsg] = React.useState('');
+
+  const recargarProfs = () => window.Auth.get('/profesionales?pageSize=100').then(r => setProfs(Array.isArray(r) ? r : (r.data || []))).catch(() => {});
+
+  React.useEffect(() => { recargarProfs(); }, []);
+
+  const crearProf = async () => {
+    if (!nuevoProf.nombre) return;
+    setSavingProf(true);
+    try {
+      await window.Auth.post('/profesionales', { nombre: nuevoProf.nombre, codigo: nuevoProf.codigo || undefined, telefono: nuevoProf.telefono || undefined, email: nuevoProf.email || undefined, color: nuevoProf.color });
+      setProfsMsg('Veterinario creado'); setTimeout(() => setProfsMsg(''), 2500);
+      setShowNuevoProf(false); setNuevoProf({ nombre: '', codigo: '', telefono: '', email: '', color: '#A3007B' });
+      recargarProfs();
+    } catch { setProfsMsg('Error al crear'); }
+    setSavingProf(false);
+  };
+
+  const guardarProf = async () => {
+    if (!editProf) return;
+    setSavingProf(true);
+    try {
+      await window.Auth.put(`/profesionales/${editProf.id}`, { nombre: editProf.nombre, codigo: editProf.codigo || null, telefono: editProf.telefono || null, email: editProf.email || null, color: editProf.color });
+      setProfsMsg('Guardado'); setTimeout(() => setProfsMsg(''), 2500);
+      setEditProf(null); recargarProfs();
+    } catch { setProfsMsg('Error al guardar'); }
+    setSavingProf(false);
+  };
+
+  const eliminarProf = async (id) => {
+    if (!window.confirm('¿Eliminar este veterinario?')) return;
+    try { await window.Auth.del(`/profesionales/${id}`); recargarProfs(); } catch { setProfsMsg('Error al eliminar'); }
+  };
+
+  // ── Tipos de servicios ──
+  const [serviciosList, setServiciosList] = React.useState([]);
+  const [editSrv, setEditSrv] = React.useState(null);
+  const [showNuevoSrv, setShowNuevoSrv] = React.useState(false);
+  const [nuevoSrv, setNuevoSrv] = React.useState({ nombre: '', codigo: '', duracionMinutos: 30, precio: 0, color: '#1976d2' });
+  const [savingSrv, setSavingSrv] = React.useState(false);
+  const [srvMsg, setSrvMsg] = React.useState('');
+
+  const recargarSrv = () => window.Auth.get('/servicios?pageSize=100').then(r => setServiciosList(Array.isArray(r) ? r : (r.data || []))).catch(() => {});
+
+  React.useEffect(() => { recargarSrv(); }, []);
+
+  const crearSrv = async () => {
+    if (!nuevoSrv.nombre || !nuevoSrv.codigo) { setSrvMsg('Nombre y código son requeridos'); return; }
+    setSavingSrv(true);
+    try {
+      await window.Auth.post('/servicios', { nombre: nuevoSrv.nombre, codigo: nuevoSrv.codigo, duracionMinutos: parseInt(nuevoSrv.duracionMinutos) || 30, precio: parseFloat(nuevoSrv.precio) || 0, color: nuevoSrv.color });
+      setSrvMsg('Servicio creado'); setTimeout(() => setSrvMsg(''), 2500);
+      setShowNuevoSrv(false); setNuevoSrv({ nombre: '', codigo: '', duracionMinutos: 30, precio: 0, color: '#1976d2' });
+      recargarSrv();
+    } catch(e) { setSrvMsg(e?.message?.includes('409') ? 'Código ya existe' : 'Error al crear'); }
+    setSavingSrv(false);
+  };
+
+  const guardarSrv = async () => {
+    if (!editSrv) return;
+    setSavingSrv(true);
+    try {
+      await window.Auth.put(`/servicios/${editSrv.id}`, { nombre: editSrv.nombre, codigo: editSrv.codigo, duracionMinutos: parseInt(editSrv.duracionMinutos) || 30, precio: parseFloat(editSrv.precio) || 0, color: editSrv.color });
+      setSrvMsg('Guardado'); setTimeout(() => setSrvMsg(''), 2500);
+      setEditSrv(null); recargarSrv();
+    } catch { setSrvMsg('Error al guardar'); }
+    setSavingSrv(false);
+  };
+
+  const eliminarSrv = async (id) => {
+    if (!window.confirm('¿Eliminar este servicio?')) return;
+    try { await window.Auth.del(`/servicios/${id}`); recargarSrv(); } catch { setSrvMsg('Error al eliminar'); }
+  };
+
+  // ── Categorías de precios ──
+  const [preciosCats, setPreciosCats] = React.useState(() => { try { return JSON.parse(localStorage.getItem('balbi_cats') || '[]'); } catch { return []; } });
+  const [nuevaCat, setNuevaCat] = React.useState('');
+
+  const agregarCat = () => {
+    const v = nuevaCat.trim();
+    if (!v || preciosCats.includes(v)) return;
+    const updated = [...preciosCats, v];
+    setPreciosCats(updated);
+    localStorage.setItem('balbi_cats', JSON.stringify(updated));
+    setNuevaCat('');
+  };
+
+  const eliminarCat = (cat) => {
+    const updated = preciosCats.filter(c => c !== cat);
+    setPreciosCats(updated);
+    localStorage.setItem('balbi_cats', JSON.stringify(updated));
+  };
+
   const inpStyle = { height: 36, padding: '0 10px', border: '1px solid #E0DCE0', borderRadius: 8, fontSize: 13, fontFamily: 'inherit', outline: 'none', width: '100%', boxSizing: 'border-box' };
 
   return (
@@ -5252,6 +5370,165 @@ const ConfiguracionView = ({ currentUser }) => {
             </>
           )}
         </div>
+
+        {/* ── Equipo de veterinarios ── */}
+        <div style={{ marginTop: 36 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+            <div>
+              <div style={{ fontSize: 16, fontWeight: 700 }}>Equipo de veterinarios</div>
+              <div style={{ fontSize: 13, color: '#888', marginTop: 3 }}>Se sincroniza con las guardias del dashboard y con el módulo de agenda.</div>
+            </div>
+            {isAdmin && <button onClick={() => { setShowNuevoProf(true); setEditProf(null); }} style={{ height: 38, padding: '0 18px', borderRadius: 10, background: '#A3007B', border: 'none', color: 'white', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>+ Nuevo veterinario</button>}
+          </div>
+          {profsMsg && <div style={{ marginBottom: 10, padding: '10px 14px', background: profsMsg.includes('Error') ? '#FEF2F4' : '#E8F5EE', borderRadius: 8, fontSize: 13, color: profsMsg.includes('Error') ? '#C2185B' : '#1F8A5B', fontWeight: 600 }}>{profsMsg}</div>}
+          {showNuevoProf && isAdmin && (
+            <div style={{ background: '#FAF7FA', border: '1px solid #E5C5DC', borderRadius: 12, padding: 18, marginBottom: 14 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#A3007B', marginBottom: 12 }}>Nuevo veterinario</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+                <div><div style={{ fontSize: 11.5, fontWeight: 600, color: '#666', marginBottom: 4 }}>Nombre *</div><input style={inpStyle} value={nuevoProf.nombre} onChange={e => setNuevoProf({...nuevoProf, nombre: e.target.value})} placeholder="Dr. Pablo Balbi" /></div>
+                <div><div style={{ fontSize: 11.5, fontWeight: 600, color: '#666', marginBottom: 4 }}>Especialidad / Cargo</div><input style={inpStyle} value={nuevoProf.codigo} onChange={e => setNuevoProf({...nuevoProf, codigo: e.target.value})} placeholder="Clínica general" /></div>
+                <div><div style={{ fontSize: 11.5, fontWeight: 600, color: '#666', marginBottom: 4 }}>Teléfono</div><input style={inpStyle} value={nuevoProf.telefono} onChange={e => setNuevoProf({...nuevoProf, telefono: e.target.value})} placeholder="+54 11 0000-0000" /></div>
+                <div><div style={{ fontSize: 11.5, fontWeight: 600, color: '#666', marginBottom: 4 }}>Email</div><input style={inpStyle} type="email" value={nuevoProf.email} onChange={e => setNuevoProf({...nuevoProf, email: e.target.value})} placeholder="vet@clinica.com" /></div>
+                <div><div style={{ fontSize: 11.5, fontWeight: 600, color: '#666', marginBottom: 4 }}>Color</div><div style={{ display: 'flex', gap: 8, alignItems: 'center' }}><input type="color" value={nuevoProf.color} onChange={e => setNuevoProf({...nuevoProf, color: e.target.value})} style={{ width: 36, height: 36, border: '1px solid #E0DCE0', borderRadius: 8, padding: 2, cursor: 'pointer', background: 'white' }} /><span style={{ fontSize: 12, color: '#888' }}>Se muestra en guardias y agenda</span></div></div>
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={crearProf} disabled={savingProf || !nuevoProf.nombre} style={{ height: 36, padding: '0 20px', borderRadius: 8, background: '#A3007B', border: 'none', color: 'white', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', opacity: (!nuevoProf.nombre || savingProf) ? 0.6 : 1 }}>{savingProf ? 'Guardando…' : 'Crear veterinario'}</button>
+                <button onClick={() => setShowNuevoProf(false)} style={{ height: 36, padding: '0 16px', borderRadius: 8, background: 'transparent', border: '1px solid #E0DCE0', color: '#666', fontWeight: 600, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>Cancelar</button>
+              </div>
+            </div>
+          )}
+          <div style={{ background: 'white', border: '1px solid #EFEAEE', borderRadius: 12, overflow: 'hidden' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '32px 1fr 120px 120px 32px 32px', padding: '9px 16px', background: '#FAFAF8', fontSize: 10.5, fontWeight: 700, color: '#888', letterSpacing: 0.4, textTransform: 'uppercase', borderBottom: '1px solid #EFEAEE' }}>
+              <div></div><div>Nombre</div><div>Especialidad</div><div>Teléfono</div><div></div><div></div>
+            </div>
+            {profs.map(p => {
+              const isEditing = editProf?.id === p.id;
+              return (
+                <div key={p.id} style={{ borderBottom: '1px solid #F4F0F2' }}>
+                  {!isEditing ? (
+                    <div style={{ display: 'grid', gridTemplateColumns: '32px 1fr 120px 120px 32px 32px', padding: '11px 16px', alignItems: 'center', fontSize: 13 }}>
+                      <div style={{ width: 24, height: 24, borderRadius: '50%', background: p.color || '#A3007B', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 800, color: 'white' }}>{p.nombre.split(' ').map(s=>s[0]).join('').slice(0,2).toUpperCase()}</div>
+                      <div style={{ fontWeight: 600 }}>{p.nombre}</div>
+                      <div style={{ color: '#777', fontSize: 12 }}>{p.codigo || '—'}</div>
+                      <div style={{ color: '#777', fontSize: 12 }}>{p.telefono || '—'}</div>
+                      {isAdmin && <button onClick={() => { setEditProf({ ...p }); setShowNuevoProf(false); }} style={{ height: 28, width: 28, borderRadius: 6, background: 'transparent', border: '1px solid #E0DCE0', color: '#888', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}>✏️</button>}
+                      {isAdmin && <button onClick={() => eliminarProf(p.id)} style={{ height: 28, width: 28, borderRadius: 6, background: 'transparent', border: '1px solid #EFEAEE', color: '#C2185B', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><IconTrash size={12} /></button>}
+                    </div>
+                  ) : (
+                    <div style={{ padding: '14px 16px', background: '#FAF7FA' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+                        <div><div style={{ fontSize: 11.5, fontWeight: 600, color: '#666', marginBottom: 4 }}>Nombre</div><input style={inpStyle} value={editProf.nombre} onChange={e => setEditProf({...editProf, nombre: e.target.value})} /></div>
+                        <div><div style={{ fontSize: 11.5, fontWeight: 600, color: '#666', marginBottom: 4 }}>Especialidad</div><input style={inpStyle} value={editProf.codigo || ''} onChange={e => setEditProf({...editProf, codigo: e.target.value})} /></div>
+                        <div><div style={{ fontSize: 11.5, fontWeight: 600, color: '#666', marginBottom: 4 }}>Teléfono</div><input style={inpStyle} value={editProf.telefono || ''} onChange={e => setEditProf({...editProf, telefono: e.target.value})} /></div>
+                        <div><div style={{ fontSize: 11.5, fontWeight: 600, color: '#666', marginBottom: 4 }}>Email</div><input style={inpStyle} type="email" value={editProf.email || ''} onChange={e => setEditProf({...editProf, email: e.target.value})} /></div>
+                        <div><div style={{ fontSize: 11.5, fontWeight: 600, color: '#666', marginBottom: 4 }}>Color</div><input type="color" value={editProf.color || '#A3007B'} onChange={e => setEditProf({...editProf, color: e.target.value})} style={{ width: 36, height: 36, border: '1px solid #E0DCE0', borderRadius: 8, padding: 2, cursor: 'pointer' }} /></div>
+                      </div>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <button onClick={guardarProf} disabled={savingProf} style={{ height: 34, padding: '0 18px', borderRadius: 8, background: '#A3007B', border: 'none', color: 'white', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', opacity: savingProf ? 0.6 : 1 }}>{savingProf ? 'Guardando…' : 'Guardar'}</button>
+                        <button onClick={() => setEditProf(null)} style={{ height: 34, padding: '0 14px', borderRadius: 8, background: 'transparent', border: '1px solid #E0DCE0', color: '#666', fontWeight: 600, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>Cancelar</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+            {profs.length === 0 && <div style={{ padding: '28px 16px', textAlign: 'center', color: '#999', fontSize: 13 }}>No hay veterinarios registrados</div>}
+          </div>
+        </div>
+
+        {/* ── Tipos de servicios ── */}
+        <div style={{ marginTop: 36 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+            <div>
+              <div style={{ fontSize: 16, fontWeight: 700 }}>Tipos de servicios</div>
+              <div style={{ fontSize: 13, color: '#888', marginTop: 3 }}>Se sincroniza con la agenda (al agendar turnos) y con la lista de precios.</div>
+            </div>
+            {isAdmin && <button onClick={() => { setShowNuevoSrv(true); setEditSrv(null); }} style={{ height: 38, padding: '0 18px', borderRadius: 10, background: '#A3007B', border: 'none', color: 'white', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>+ Nuevo servicio</button>}
+          </div>
+          {srvMsg && <div style={{ marginBottom: 10, padding: '10px 14px', background: srvMsg.includes('Error') || srvMsg.includes('existe') ? '#FEF2F4' : '#E8F5EE', borderRadius: 8, fontSize: 13, color: srvMsg.includes('Error') || srvMsg.includes('existe') ? '#C2185B' : '#1F8A5B', fontWeight: 600 }}>{srvMsg}</div>}
+          {showNuevoSrv && isAdmin && (
+            <div style={{ background: '#FAF7FA', border: '1px solid #E5C5DC', borderRadius: 12, padding: 18, marginBottom: 14 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#A3007B', marginBottom: 12 }}>Nuevo servicio</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+                <div><div style={{ fontSize: 11.5, fontWeight: 600, color: '#666', marginBottom: 4 }}>Nombre *</div><input style={inpStyle} value={nuevoSrv.nombre} onChange={e => setNuevoSrv({...nuevoSrv, nombre: e.target.value})} placeholder="Consulta general" /></div>
+                <div><div style={{ fontSize: 11.5, fontWeight: 600, color: '#666', marginBottom: 4 }}>Código * <span style={{ fontWeight: 400, color: '#AAA' }}>(único)</span></div><input style={inpStyle} value={nuevoSrv.codigo} onChange={e => setNuevoSrv({...nuevoSrv, codigo: e.target.value.toUpperCase()})} placeholder="CONSULTA" /></div>
+                <div><div style={{ fontSize: 11.5, fontWeight: 600, color: '#666', marginBottom: 4 }}>Duración (min)</div><input style={inpStyle} type="number" value={nuevoSrv.duracionMinutos} onChange={e => setNuevoSrv({...nuevoSrv, duracionMinutos: e.target.value})} /></div>
+                <div><div style={{ fontSize: 11.5, fontWeight: 600, color: '#666', marginBottom: 4 }}>Precio ($)</div><input style={inpStyle} type="number" value={nuevoSrv.precio} onChange={e => setNuevoSrv({...nuevoSrv, precio: e.target.value})} /></div>
+                <div><div style={{ fontSize: 11.5, fontWeight: 600, color: '#666', marginBottom: 4 }}>Color</div><div style={{ display: 'flex', gap: 8, alignItems: 'center' }}><input type="color" value={nuevoSrv.color} onChange={e => setNuevoSrv({...nuevoSrv, color: e.target.value})} style={{ width: 36, height: 36, border: '1px solid #E0DCE0', borderRadius: 8, padding: 2, cursor: 'pointer', background: 'white' }} /><span style={{ fontSize: 12, color: '#888' }}>Color en la agenda</span></div></div>
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={crearSrv} disabled={savingSrv || !nuevoSrv.nombre || !nuevoSrv.codigo} style={{ height: 36, padding: '0 20px', borderRadius: 8, background: '#A3007B', border: 'none', color: 'white', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', opacity: (!nuevoSrv.nombre || !nuevoSrv.codigo || savingSrv) ? 0.6 : 1 }}>{savingSrv ? 'Guardando…' : 'Crear servicio'}</button>
+                <button onClick={() => setShowNuevoSrv(false)} style={{ height: 36, padding: '0 16px', borderRadius: 8, background: 'transparent', border: '1px solid #E0DCE0', color: '#666', fontWeight: 600, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>Cancelar</button>
+              </div>
+            </div>
+          )}
+          <div style={{ background: 'white', border: '1px solid #EFEAEE', borderRadius: 12, overflow: 'hidden' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '28px 1fr 80px 80px 70px 32px 32px', padding: '9px 16px', background: '#FAFAF8', fontSize: 10.5, fontWeight: 700, color: '#888', letterSpacing: 0.4, textTransform: 'uppercase', borderBottom: '1px solid #EFEAEE' }}>
+              <div></div><div>Nombre</div><div>Código</div><div>Duración</div><div>Precio</div><div></div><div></div>
+            </div>
+            {serviciosList.map(s => {
+              const isEditing = editSrv?.id === s.id;
+              return (
+                <div key={s.id} style={{ borderBottom: '1px solid #F4F0F2' }}>
+                  {!isEditing ? (
+                    <div style={{ display: 'grid', gridTemplateColumns: '28px 1fr 80px 80px 70px 32px 32px', padding: '11px 16px', alignItems: 'center', fontSize: 13 }}>
+                      <div style={{ width: 14, height: 14, borderRadius: 4, background: s.color || '#1976d2', flexShrink: 0 }} />
+                      <div style={{ fontWeight: 600 }}>{s.nombre}</div>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: '#888', background: '#F4F0F2', borderRadius: 5, padding: '2px 7px', display: 'inline-block' }}>{s.codigo}</div>
+                      <div style={{ color: '#777', fontSize: 12 }}>{s.duracionMinutos} min</div>
+                      <div style={{ color: '#777', fontSize: 12 }}>${s.precio ?? 0}</div>
+                      {isAdmin && <button onClick={() => { setEditSrv({ ...s }); setShowNuevoSrv(false); }} style={{ height: 28, width: 28, borderRadius: 6, background: 'transparent', border: '1px solid #E0DCE0', color: '#888', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}>✏️</button>}
+                      {isAdmin && <button onClick={() => eliminarSrv(s.id)} style={{ height: 28, width: 28, borderRadius: 6, background: 'transparent', border: '1px solid #EFEAEE', color: '#C2185B', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><IconTrash size={12} /></button>}
+                    </div>
+                  ) : (
+                    <div style={{ padding: '14px 16px', background: '#FAF7FA' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+                        <div><div style={{ fontSize: 11.5, fontWeight: 600, color: '#666', marginBottom: 4 }}>Nombre</div><input style={inpStyle} value={editSrv.nombre} onChange={e => setEditSrv({...editSrv, nombre: e.target.value})} /></div>
+                        <div><div style={{ fontSize: 11.5, fontWeight: 600, color: '#666', marginBottom: 4 }}>Código</div><input style={inpStyle} value={editSrv.codigo} onChange={e => setEditSrv({...editSrv, codigo: e.target.value.toUpperCase()})} /></div>
+                        <div><div style={{ fontSize: 11.5, fontWeight: 600, color: '#666', marginBottom: 4 }}>Duración (min)</div><input style={inpStyle} type="number" value={editSrv.duracionMinutos} onChange={e => setEditSrv({...editSrv, duracionMinutos: e.target.value})} /></div>
+                        <div><div style={{ fontSize: 11.5, fontWeight: 600, color: '#666', marginBottom: 4 }}>Precio ($)</div><input style={inpStyle} type="number" value={editSrv.precio ?? 0} onChange={e => setEditSrv({...editSrv, precio: e.target.value})} /></div>
+                        <div><div style={{ fontSize: 11.5, fontWeight: 600, color: '#666', marginBottom: 4 }}>Color</div><input type="color" value={editSrv.color || '#1976d2'} onChange={e => setEditSrv({...editSrv, color: e.target.value})} style={{ width: 36, height: 36, border: '1px solid #E0DCE0', borderRadius: 8, padding: 2, cursor: 'pointer' }} /></div>
+                      </div>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <button onClick={guardarSrv} disabled={savingSrv} style={{ height: 34, padding: '0 18px', borderRadius: 8, background: '#A3007B', border: 'none', color: 'white', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', opacity: savingSrv ? 0.6 : 1 }}>{savingSrv ? 'Guardando…' : 'Guardar'}</button>
+                        <button onClick={() => setEditSrv(null)} style={{ height: 34, padding: '0 14px', borderRadius: 8, background: 'transparent', border: '1px solid #E0DCE0', color: '#666', fontWeight: 600, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>Cancelar</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+            {serviciosList.length === 0 && <div style={{ padding: '28px 16px', textAlign: 'center', color: '#999', fontSize: 13 }}>No hay servicios registrados</div>}
+          </div>
+        </div>
+
+        {/* ── Categorías de lista de precios ── */}
+        <div style={{ marginTop: 36, marginBottom: 32 }}>
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ fontSize: 16, fontWeight: 700 }}>Categorías de lista de precios</div>
+            <div style={{ fontSize: 13, color: '#888', marginTop: 3 }}>Las categorías aparecen en el módulo de Precios al agregar o filtrar productos.</div>
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
+            {preciosCats.map(cat => (
+              <span key={cat} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 12px', background: '#FAF1F7', border: '1px solid #E5C5DC', borderRadius: 999, fontSize: 13, fontWeight: 600, color: '#A3007B' }}>
+                {cat}
+                <button onClick={() => eliminarCat(cat)} style={{ background: 'none', border: 'none', color: '#C2185B', cursor: 'pointer', padding: 0, fontSize: 12, display: 'flex', alignItems: 'center', lineHeight: 1 }}>✕</button>
+              </span>
+            ))}
+            {preciosCats.length === 0 && <span style={{ fontSize: 13, color: '#BBB' }}>Sin categorías aún</span>}
+          </div>
+          <div style={{ display: 'flex', gap: 8, maxWidth: 380 }}>
+            <input
+              style={{ ...inpStyle, flex: 1 }}
+              value={nuevaCat}
+              onChange={e => setNuevaCat(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && agregarCat()}
+              placeholder="Ej. Vacunas, Antiparasitarios…"
+            />
+            <button onClick={agregarCat} disabled={!nuevaCat.trim()} style={{ height: 36, padding: '0 18px', borderRadius: 8, background: '#A3007B', border: 'none', color: 'white', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', opacity: !nuevaCat.trim() ? 0.5 : 1, whiteSpace: 'nowrap' }}>+ Agregar</button>
+          </div>
+        </div>
+
       </div>
     </div>
   );
