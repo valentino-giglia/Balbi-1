@@ -1251,6 +1251,7 @@ const Dashboard = ({ goTo, openSearch }) => {
 
   // Persistir vets y guardias en localStorage
   useEffectD(() => { localStorage.setItem('balbi_guardia', JSON.stringify({ vets, guardias })); }, [vets, guardias]);
+  useEffectD(() => { window._goTo = goTo; }, [goTo]);
 
   useEffectD(() => {
     if (!window.Auth?.getToken()) return;
@@ -1275,8 +1276,12 @@ const Dashboard = ({ goTo, openSearch }) => {
 
   const guardiaActiva = guardias.find(g => g.activa) || guardias[0];
   const vetActivo = vets.find(v => v.id === guardiaActiva?.vetId);
-  const proxima = guardiaActiva ? guardias.find(g => !g.activa && g.fecha >= guardiaActiva.fecha) : undefined;
-  const proxVet = vets.find(v => v.id === proxima?.vetId);
+  const guardiasOrdenadas = [...guardias].sort((a, b) => ((a.fecha||'')+(a.desde||'')).localeCompare((b.fecha||'')+(b.desde||'')));
+  const proxima = guardiaActiva
+    ? guardiasOrdenadas.find(g => g.id !== guardiaActiva.id && ((g.fecha > guardiaActiva.fecha) || (g.fecha === guardiaActiva.fecha && (g.desde||'') >= (guardiaActiva.hasta||''))))
+    : guardiasOrdenadas.find(g => !g.activa);
+  const proxVet = vets.find(v => v.id === proxima?.vetId)
+    || (!proxima && guardiaActiva ? (() => { const idx = vets.findIndex(v => v.id === guardiaActiva.vetId); return vets[(idx + 1) % vets.length]; })() : undefined);
 
   const [_dashTick, _setDashTick] = useStateD(0);
   useEffectD(() => { const t = setInterval(() => _setDashTick(n => n + 1), 1000); return () => clearInterval(t); }, []);
@@ -1294,11 +1299,31 @@ const Dashboard = ({ goTo, openSearch }) => {
     return { restante: rh > 0 ? `${rh}h ${rm}min` : `${rm}min`, progreso: pct };
   })();
 
+  const [kpiData, setKpiData] = useStateD({ hoy: null, ayer: null });
+  useEffectD(() => {
+    if (!window.Auth?.getToken()) return;
+    const hoy = window.todayAR();
+    const ayerDate = new Date(hoy + 'T00:00:00Z');
+    ayerDate.setUTCDate(ayerDate.getUTCDate() - 1);
+    const ayer = ayerDate.toISOString().slice(0, 10);
+    Promise.all([
+      window.Auth.get(`/turnos?fechaInicio=${hoy}T00:00:00&fechaFin=${hoy}T23:59:59`).catch(() => []),
+      window.Auth.get(`/turnos?fechaInicio=${ayer}T00:00:00&fechaFin=${ayer}T23:59:59`).catch(() => []),
+    ]).then(([rHoy, rAyer]) => {
+      const cHoy = Array.isArray(rHoy) ? rHoy.length : (rHoy.data?.length ?? 0);
+      const cAyer = Array.isArray(rAyer) ? rAyer.length : (rAyer.data?.length ?? 0);
+      setKpiData({ hoy: cHoy, ayer: cAyer });
+    });
+  }, []);
+
+  const _kpiHoy = kpiData.hoy;
+  const _kpiAyer = kpiData.ayer;
+  const _kpiDiff = _kpiHoy != null && _kpiAyer != null ? _kpiHoy - _kpiAyer : null;
   const kpis = [
-    { label: 'Ingresos últimas 24hs', value: 14, sub: '+3 vs ayer', trend: 'up', color: '#A3007B' },
+    { label: 'Turnos hoy', value: _kpiHoy != null ? _kpiHoy : '—', sub: _kpiDiff != null && _kpiHoy > 0 ? (_kpiDiff >= 0 ? `+${_kpiDiff} vs ayer` : `${_kpiDiff} vs ayer`) : (_kpiHoy === 0 ? 'sin turnos aún' : ''), trend: 'up', color: '#A3007B' },
     { label: 'Internados ahora', value: internados.length, sub: `${internados.filter(i => i.estado === 'critico').length} críticos`, trend: 'flat', color: '#D97706' },
-    { label: 'Casos críticos 24hs', value: 2, sub: 'estables', trend: 'flat', color: '#C2185B' },
-    { label: 'Tiempo prom. atención', value: '12m', sub: '-3m vs prom 7d', trend: 'up', color: '#1F8A5B' },
+    { label: 'Críticos internados', value: internados.filter(i => i.estado === 'critico').length || (internados.length > 0 ? 0 : '—'), sub: internados.length > 0 ? 'estables: ' + internados.filter(i => i.estado === 'estable').length : 'sin internados', trend: 'flat', color: '#C2185B' },
+    { label: 'Tiempo prom. atención', value: '—', sub: 'disponible con datos', trend: 'flat', color: '#1F8A5B' },
   ];
 
   return (
@@ -1344,6 +1369,8 @@ const Dashboard = ({ goTo, openSearch }) => {
           goTo={goTo}
         />
       </div>
+
+      <TurnosDia vets={vets} />
 
       <div style={{ textAlign: 'center', color: '#999', fontSize: 11.5, padding: '4px 0 8px' }}>
         📊 Las estadísticas y gráficos analíticos se movieron a <a onClick={() => goTo && goTo('agenda')} style={{ color: '#A3007B', cursor: 'pointer', fontWeight: 600 }}>Análisis</a> · Esta vista es operativa en tiempo real
@@ -1442,13 +1469,15 @@ const GuardiaHero = ({ guardia, vet, proxima, proxVet, restante, progreso, onEdi
               <div style={{ width: 32, height: 32, borderRadius: '50%', background: proxVet.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 12, color: 'white', flexShrink: 0 }}>{proxVet.initials}</div>
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontSize: 12.5, fontWeight: 600, color: 'white', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{proxVet.name}</div>
-                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)' }}>{proxima.desde} · {proxima.tipo}</div>
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)' }}>
+                  {proxima ? `${proxima.desde} · ${proxima.tipo}` : 'Siguiente en rotación'}
+                </div>
               </div>
             </div>
           ) : (
             <React.Fragment>
-              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginBottom: 10 }}>Sin guardia siguiente programada</div>
-              {_isAdmin && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)' }}>Usá "Equipo de guardia" para agregar la siguiente</div>}
+              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginBottom: 10 }}>Sin siguiente en el equipo</div>
+              {_isAdmin && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)' }}>Agregá más veterinarios al equipo de guardia</div>}
             </React.Fragment>
           )}
           <div style={{ display: 'flex', gap: 6 }}>
@@ -1538,21 +1567,71 @@ const IngresosChart = () => {
     { key: 'cirugias', label: 'Cirugías', color: '#1F8A5B' },
     { key: 'vacunaciones', label: 'Vacunaciones', color: '#2D5BA0' },
   ];
-  const data = [
-    { sem: 'Sem 1', urgencias: 18, controles: 24, cirugias: 6, vacunaciones: 12 },
-    { sem: 'Sem 2', urgencias: 22, controles: 28, cirugias: 8, vacunaciones: 14 },
-    { sem: 'Sem 3', urgencias: 15, controles: 31, cirugias: 5, vacunaciones: 18 },
-    { sem: 'Sem 4', urgencias: 26, controles: 27, cirugias: 9, vacunaciones: 11 },
-  ];
   const [hover, setHover] = useStateD(null);
+  const [data, setData] = useStateD(null);
+
+  const classifyService = (nombre) => {
+    const n = (nombre || '').toLowerCase();
+    if (n.includes('urgencia') || n.includes('emergencia')) return 'urgencias';
+    if (n.includes('cirug') || n.includes('operac')) return 'cirugias';
+    if (n.includes('vacun')) return 'vacunaciones';
+    return 'controles';
+  };
+
+  useEffectD(() => {
+    if (!window.Auth?.getToken()) return;
+    const now = window.nowAR ? window.nowAR() : new Date();
+    const todayStr = now.toISOString().slice(0, 10);
+    const weeks = Array.from({ length: 4 }, (_, i) => {
+      const end = new Date(todayStr + 'T00:00:00Z');
+      end.setUTCDate(end.getUTCDate() - (3 - i) * 7);
+      const start = new Date(end);
+      start.setUTCDate(end.getUTCDate() - 6);
+      return { sem: i === 3 ? 'Esta sem' : `Sem -${3 - i}`, start: start.toISOString().slice(0, 10), end: end.toISOString().slice(0, 10) };
+    });
+    const globalStart = weeks[0].start;
+    const globalEnd = weeks[3].end;
+    window.Auth.get(`/turnos?fechaInicio=${globalStart}T00:00:00&fechaFin=${globalEnd}T23:59:59&pageSize=500`).then(res => {
+      const raw = Array.isArray(res) ? res : (res.data || []);
+      const result = weeks.map(w => {
+        const counts = { urgencias: 0, controles: 0, cirugias: 0, vacunaciones: 0 };
+        raw.forEach(t => {
+          const fecha = (t.horaInicio || '').slice(0, 10);
+          if (fecha >= w.start && fecha <= w.end) counts[classifyService(t.servicio?.nombre)]++;
+        });
+        return { sem: w.sem, ...counts };
+      });
+      setData(result);
+    }).catch(() => setData([]));
+  }, []);
+
+  if (data === null) {
+    return (
+      <div style={{ background: '#FAFAF8', border: '1px solid #EFEAEE', borderRadius: 12, padding: '18px 20px', flexShrink: 0, height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ fontSize: 12, color: '#BBB' }}>Cargando estadísticas…</div>
+      </div>
+    );
+  }
+
+  const totals = data.map(d => d.urgencias + d.controles + d.cirugias + d.vacunaciones);
+  const totalGlobal = totals.reduce((s, v) => s + v, 0);
+
+  if (totalGlobal === 0) {
+    return (
+      <div style={{ background: '#FAFAF8', border: '1px solid #EFEAEE', borderRadius: 12, padding: '36px 20px', flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
+        <div style={{ fontSize: 32, opacity: 0.2 }}>📊</div>
+        <div style={{ fontSize: 13, fontWeight: 700, color: '#1A1A1A' }}>Ingresos por tipo — últimas 4 semanas</div>
+        <div style={{ fontSize: 12, color: '#AAA', textAlign: 'center', lineHeight: 1.7 }}>El gráfico aparecerá automáticamente<br/>cuando haya turnos registrados.</div>
+      </div>
+    );
+  }
 
   const W = 760, H = 280;
   const padL = 44, padR = 20, padT = 24, padB = 44;
   const innerW = W - padL - padR;
   const innerH = H - padT - padB;
-  const totals = data.map(d => d.urgencias + d.controles + d.cirugias + d.vacunaciones);
   const maxRaw = Math.max(...totals);
-  const niceMax = Math.ceil(maxRaw / 10) * 10;
+  const niceMax = Math.ceil(maxRaw / 10) * 10 || 10;
   const yTicks = 5;
   const yStep = niceMax / yTicks;
   const barW = innerW / data.length * 0.5;
@@ -1563,7 +1642,7 @@ const IngresosChart = () => {
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 6 }}>
         <div>
           <div style={{ fontSize: 14, fontWeight: 700, color: '#1A1A1A' }}>Ingresos por tipo — últimas 4 semanas</div>
-          <div style={{ fontSize: 11.5, color: '#888', marginTop: 2 }}>{totals.reduce((s, v) => s + v, 0)} consultas totales · promedio {(totals.reduce((s,v)=>s+v,0)/4).toFixed(0)}/sem</div>
+          <div style={{ fontSize: 11.5, color: '#888', marginTop: 2 }}>{totalGlobal} consultas totales · promedio {(totalGlobal / 4).toFixed(0)}/sem</div>
         </div>
       </div>
 
@@ -1962,6 +2041,113 @@ const CierreGuardiaModal = ({ vet, proxVet, onClose, onConfirm }) => (
     </div>
   </Modal>
 );
+
+// ─── Turnos del día — agenda completa con persistencia en DB ─────────────────
+const TurnosDia = ({ vets }) => {
+  const [turnos, setTurnos] = useStateD([]);
+  const [loading, setLoading] = useStateD(true);
+  const [tick, setTick] = useStateD(0);
+
+  const cargar = () => {
+    if (!window.Auth?.getToken()) return;
+    const hoy = window.todayAR();
+    window.Auth.get(`/turnos?fechaInicio=${hoy}T00:00:00&fechaFin=${hoy}T23:59:59&pageSize=200`).then(res => {
+      const raw = Array.isArray(res) ? res : (res.data || []);
+      setTurnos(raw.sort((a, b) => (a.horaInicio || '').localeCompare(b.horaInicio || '')));
+      setLoading(false);
+    }).catch(() => setLoading(false));
+  };
+
+  useEffectD(() => { cargar(); }, [tick]);
+  useEffectD(() => { const t = setInterval(() => setTick(n => n + 1), 60000); return () => clearInterval(t); }, []);
+
+  const cambiarEstado = async (id, estado) => {
+    try {
+      await window.Auth.put(`/turnos/${id}`, { estado });
+      setTurnos(prev => prev.map(t => t.id === id ? { ...t, estado } : t));
+    } catch {}
+  };
+
+  const estadoColor = { RESERVADO: '#2D5BA0', PENDIENTE: '#D97706', COMPLETADO: '#1F8A5B', CANCELADO: '#999', BAJA: '#CCC' };
+  const estadoLabel = { RESERVADO: 'Reservado', PENDIENTE: 'Pendiente', COMPLETADO: 'Atendido', CANCELADO: 'Cancelado', BAJA: 'Baja' };
+
+  const pendientes = turnos.filter(t => t.estado === 'RESERVADO' || t.estado === 'PENDIENTE');
+  const atendidos = turnos.filter(t => t.estado === 'COMPLETADO');
+
+  return (
+    <div style={{ background: 'white', border: '1px solid #EFEAEE', borderRadius: 12, padding: 18 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+        <div>
+          <div style={{ fontSize: 14, fontWeight: 700 }}>Turnos del día</div>
+          <div style={{ fontSize: 12, color: '#888', marginTop: 2 }}>
+            {loading ? 'Cargando…' : `${pendientes.length} pendientes · ${atendidos.length} atendidos`}
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={() => setTick(n => n + 1)} title="Actualizar" style={{ height: 34, width: 34, borderRadius: 8, background: '#FAFAF8', border: '1px solid #EFEAEE', color: '#888', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14 }}>↻</button>
+          <a href="#agenda" onClick={(e) => { e.preventDefault(); window._goTo && window._goTo('agenda'); }} style={{ height: 34, padding: '0 14px', borderRadius: 8, background: '#FAF1F7', border: '1px solid #EFE4EE', color: '#A3007B', fontSize: 11.5, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, textDecoration: 'none' }}>
+            <IconCalendar size={12} /> Agenda completa
+          </a>
+        </div>
+      </div>
+
+      {loading && <div style={{ padding: '30px 0', textAlign: 'center', color: '#BBB', fontSize: 13 }}>Cargando turnos…</div>}
+
+      {!loading && turnos.length === 0 && (
+        <div style={{ padding: '30px 0', textAlign: 'center', color: '#999', fontSize: 13 }}>
+          No hay turnos agendados para hoy.<br/>
+          <span style={{ fontSize: 11.5, color: '#BBB' }}>Creá turnos desde el módulo de Agenda.</span>
+        </div>
+      )}
+
+      {!loading && turnos.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+          {/* Header */}
+          <div style={{ display: 'grid', gridTemplateColumns: '56px 1fr 1fr 1fr 110px 120px', gap: 10, padding: '6px 10px', fontSize: 10.5, fontWeight: 700, color: '#999', letterSpacing: 0.4, textTransform: 'uppercase', borderBottom: '1px solid #F4F0F2' }}>
+            <div>Hora</div><div>Paciente</div><div>Titular</div><div>Veterinario</div><div>Estado</div><div></div>
+          </div>
+          {turnos.map((t) => {
+            const hora = t.horaInicio ? new Date(new Date(t.horaInicio).getTime() - 0).toISOString().slice(11, 16) : '—';
+            const isPending = t.estado === 'RESERVADO' || t.estado === 'PENDIENTE';
+            const isDone = t.estado === 'COMPLETADO';
+            const isCancelled = t.estado === 'CANCELADO' || t.estado === 'BAJA';
+            return (
+              <div key={t.id} style={{
+                display: 'grid', gridTemplateColumns: '56px 1fr 1fr 1fr 110px 120px', gap: 10, alignItems: 'center',
+                padding: '9px 10px', borderRadius: 8,
+                background: isDone ? '#F8FDF8' : isCancelled ? '#FAFAFA' : 'white',
+                opacity: isCancelled ? 0.55 : 1,
+                borderBottom: '1px solid #F8F4F6',
+              }}>
+                <div style={{ fontFamily: 'ui-monospace, monospace', fontSize: 13, fontWeight: 700, color: isPending ? '#A3007B' : '#888' }}>{hora}</div>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: isDone ? '#888' : '#1A1A1A' }}>{t.mascota?.nombre || '—'}</div>
+                  <div style={{ fontSize: 11, color: '#AAA' }}>{t.servicio?.nombre || t.notas || '—'}</div>
+                </div>
+                <div style={{ fontSize: 12.5, color: '#555' }}>{t.paciente?.nombre || '—'}</div>
+                <div style={{ fontSize: 12.5, color: '#555' }}>{t.profesional?.nombre || '—'}</div>
+                <div>
+                  <span style={{ fontSize: 10.5, fontWeight: 700, color: estadoColor[t.estado] || '#999', background: (estadoColor[t.estado] || '#999') + '18', borderRadius: 6, padding: '3px 8px', letterSpacing: 0.3 }}>
+                    {estadoLabel[t.estado] || t.estado}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', gap: 4 }}>
+                  {isPending && (
+                    <button onClick={() => cambiarEstado(t.id, 'COMPLETADO')} style={{ height: 28, padding: '0 10px', borderRadius: 6, background: '#1F8A5B', border: 'none', color: 'white', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>Atendido</button>
+                  )}
+                  {isPending && (
+                    <button onClick={() => cambiarEstado(t.id, 'CANCELADO')} style={{ height: 28, width: 28, borderRadius: 6, background: 'white', border: '1px solid #E0DCE0', color: '#999', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}>✕</button>
+                  )}
+                  {isDone && <span style={{ fontSize: 11.5, color: '#1F8A5B', fontWeight: 600 }}>✓ Listo</span>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
 
 const selStyle = { height: 38, padding: '0 12px', borderRadius: 8, border: '1px solid #E0DCE0', fontSize: 14, fontFamily: 'inherit', outline: 'none', width: '100%', background: 'white' };
 
@@ -3587,97 +3773,158 @@ window.LibretaView = LibretaView;
 
 
 <script type="text/babel">
-const CHAT_LOGS = {
-  1: [
-    { from: 'client', text: 'Buen día doctor, Lola está mucho mejor hoy', time: '10:30' },
-    { from: 'me', text: 'Qué buenas noticias! Seguí con la medicación hasta completar los 7 días', time: '10:38' },
-    { from: 'client', text: 'Perfecto, gracias doctor!', time: '10:42' },
-  ],
-  2: [
-    { from: 'client', text: 'Buen día doctor', time: '09:50' },
-    { from: 'me', text: 'Buen día Carlos! ¿Cómo amaneció Rocco?', time: '09:52' },
-    { from: 'client', text: 'Comió un poco más que ayer pero todavía está medio decaído', time: '09:55' },
-    { from: 'client', text: 'Le adjunto una foto de cómo está la herida', time: '09:55' },
-    { from: 'client', img: true, time: '09:56' },
-    { from: 'me', text: 'Perfecto, la herida está cicatrizando muy bien. Mantenele la curación 2 veces al día y seguimos con el meloxicam', time: '10:10' },
-    { from: 'client', text: '¿Cómo está Rocco hoy?', time: '10:15' },
-    { from: 'client', text: '¿Lo puedo pasar a buscar mañana a la tarde?', time: '10:15' },
-  ],
-  3: [
-    { from: 'me', text: 'Recordatorio: Luna tiene turno mañana a las 09:00hs para control anual.', time: 'Ayer' },
-  ],
-  4: [
-    { from: 'client', text: 'Doctor, le mando la foto del oído de Felipe', time: 'Ayer' },
-    { from: 'client', img: true, time: 'Ayer' },
-    { from: 'me', text: 'Gracias! Lo reviso y te comento en un momento', time: 'Ayer' },
-  ],
-  6: [
-    { from: 'client', text: 'Bruno comió bien esta mañana, ya está más animado', time: '08:30' },
-    { from: 'me', text: 'Muy bien! Eso es una señal positiva. Seguimos con la observación hasta la tarde.', time: '08:45' },
-  ],
-  7: [
-    { from: 'client', text: 'Gracias por la atención! Nala ya está mucho mejor en casa', time: 'Lun' },
-    { from: 'me', text: 'Me alegra mucho! Cualquier cosa no duden en escribirme', time: 'Lun' },
-  ],
-};
-
-// Mensajes - chat moderno
+// Mensajes — WhatsApp real via Kapso
 const MensajesView = ({ initialClientId }) => {
-  const [active, setActive] = useState(initialClientId || 2);
-  const [search, setSearch] = useState('');
-  const [chatLogs, setChatLogs] = useState(CHAT_LOGS);
-  const conv = MENSAJES.find(m => m.id === active);
-  const client = CLIENTS.find(c => c.id === conv?.clientId);
+  const [convs, setConvs] = useState([]);
+  const [activeId, setActiveId] = useState(null);
+  const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState('');
+  const [search, setSearch] = useState('');
+  const [loadingConvs, setLoadingConvs] = useState(true);
+  const [loadingMsgs, setLoadingMsgs] = useState(false);
+  const [waError, setWaError] = useState(null);
   const [showEmoji, setShowEmoji] = useState(false);
-  const chatLog = chatLogs[active] || [];
+  const [sending, setSending] = useState(false);
+  const bottomRef = React.useRef(null);
 
-  const send = () => {
-    if (!draft.trim()) return;
-    setChatLogs({ ...chatLogs, [active]: [...chatLog, { from: 'me', text: draft, time: 'ahora' }] });
-    setDraft('');
+  const activePac = convs.find(c => c.id === activeId);
+
+  // Cargar lista de pacientes con WhatsApp vinculado
+  useEffect(() => {
+    if (!window.Auth?.getToken()) return;
+    window.Auth.get('/chat/pacientes?limit=100').then(res => {
+      const rows = res.data || [];
+      setConvs(rows);
+      const preSelect = initialClientId ? rows.find(r => r.id === initialClientId) : null;
+      if (preSelect) setActiveId(preSelect.id);
+      else if (rows.length > 0) setActiveId(rows[0].id);
+      setLoadingConvs(false);
+    }).catch(() => {
+      setWaError('No se pudo conectar con el servidor');
+      setLoadingConvs(false);
+    });
+  }, []);
+
+  // Cargar mensajes del paciente seleccionado
+  useEffect(() => {
+    if (!activeId || !activePac?.kapso_phone_number_id) return;
+    setLoadingMsgs(true);
+    setMessages([]);
+    setWaError(null);
+    const pid = encodeURIComponent(activePac.kapso_phone_number_id);
+    const cid = activePac.kapso_conversation_id ? '&conversation_id=' + encodeURIComponent(activePac.kapso_conversation_id) : '';
+    window.Auth.get(`/chat/mensajes?phone_number_id=${pid}${cid}&limit=50`).then(res => {
+      setMessages(res.data || []);
+      setLoadingMsgs(false);
+    }).catch(e => {
+      const code = (e?.message || '').match(/\d+/)?.[0];
+      if (code === '500') setWaError('KAPSO_API_KEY no configurada. Revisá el archivo .env del servidor.');
+      else setWaError('Error al cargar mensajes');
+      setLoadingMsgs(false);
+    });
+  }, [activeId]);
+
+  // Scroll al fondo con nuevos mensajes
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  const formatTime = (ts) => {
+    if (!ts) return '';
+    const d = new Date(parseInt(ts) * 1000);
+    return d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
   };
 
-  const filteredMensajes = MENSAJES.filter(m => {
-    if (!search.trim()) return true;
-    const c = CLIENTS.find(cl => cl.id === m.clientId);
-    return c?.name.toLowerCase().includes(search.toLowerCase()) || m.lastMsg.toLowerCase().includes(search.toLowerCase());
-  });
+  const send = async () => {
+    if (!draft.trim() || !activePac || sending) return;
+    const text = draft.trim();
+    setDraft('');
+    const tmpId = 'tmp-' + Date.now();
+    setMessages(prev => [...prev, { id: tmpId, type: 'TEXT', direction: 'outbound', text, timestamp: String(Math.floor(Date.now() / 1000)) }]);
+    setSending(true);
+    try {
+      await window.Auth.post('/chat/mensajes', { phone_number_id: activePac.kapso_phone_number_id, to: activePac.telefono, text });
+    } catch {
+      setMessages(prev => prev.filter(m => m.id !== tmpId));
+      setDraft(text);
+    } finally { setSending(false); }
+  };
+
+  const sendMedia = async (file) => {
+    if (!activePac) return;
+    const ext = file.name.split('.').pop().toLowerCase();
+    const icons = { pdf: '📄', doc: '📝', docx: '📝', mp4: '🎥', mov: '🎥', xlsx: '📊', pptx: '📊', jpg: '🖼', jpeg: '🖼', png: '🖼' };
+    const isImage = ['jpg','jpeg','png','gif','webp'].includes(ext);
+    const kb = (file.size / 1024).toFixed(0);
+    const tmpId = 'tmp-' + Date.now();
+    setMessages(prev => [...prev, { id: tmpId, type: isImage ? 'IMAGE' : 'DOCUMENT', direction: 'outbound', text: file.name, timestamp: String(Math.floor(Date.now() / 1000)), _icon: icons[ext] || '📎', _size: kb + ' KB' }]);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('pacienteID', String(activePac.id));
+      const uploadRes = await fetch(`${window.API_BASE}/files`, { method: 'POST', headers: { Authorization: `Bearer ${window.Auth.getToken()}` }, body: formData });
+      if (uploadRes.ok) {
+        const up = await uploadRes.json();
+        if (up.url) {
+          await window.Auth.post('/chat/mensajes', { phone_number_id: activePac.kapso_phone_number_id, to: activePac.telefono, type: isImage ? 'image' : 'document', mediaUrl: up.url, fileName: file.name, caption: file.name });
+        }
+      }
+    } catch {}
+  };
+
+  const filtered = convs.filter(c => !search.trim() || (c.nombre || '').toLowerCase().includes(search.toLowerCase()) || (c.telefono || '').includes(search));
+
+  // Estado: sin WhatsApp configurado o sin conversaciones
+  if (!loadingConvs && convs.length === 0) {
+    return (
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 14, padding: 48 }}>
+        <div style={{ fontSize: 52, opacity: 0.2 }}>💬</div>
+        <div style={{ fontSize: 15, fontWeight: 700, color: '#1A1A1A' }}>WhatsApp no conectado</div>
+        <div style={{ fontSize: 13, color: '#888', textAlign: 'center', lineHeight: 1.8, maxWidth: 380 }}>
+          {waError || 'No hay clientes con WhatsApp vinculado aún.'}<br/>
+          Para activar, configurá las credenciales en <code style={{ background: '#F4F0F2', padding: '1px 6px', borderRadius: 4, fontSize: 12 }}>.env</code>:
+        </div>
+        <div style={{ background: '#1A1A1A', color: '#CDE', borderRadius: 10, padding: '14px 20px', fontSize: 12, fontFamily: 'ui-monospace, monospace', lineHeight: 2.2, width: '100%', maxWidth: 380 }}>
+          <div style={{ color: '#777' }}># .env</div>
+          <div>KAPSO_API_KEY=<span style={{ color: '#7FDFB0' }}>tu_clave_aquí</span></div>
+          <div>WHATSAPP_ID=<span style={{ color: '#7FDFB0' }}>tu_numero_id</span></div>
+        </div>
+        <div style={{ fontSize: 12, color: '#AAA', textAlign: 'center', maxWidth: 380, lineHeight: 1.7 }}>
+          Luego vinculá el número de WhatsApp de cada cliente desde su ficha en <strong>Clientes</strong>.
+        </div>
+      </div>
+    );
+  }
+
+  if (loadingConvs) {
+    return <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div style={{ fontSize: 13, color: '#BBB' }}>Cargando conversaciones…</div></div>;
+  }
 
   return (
     <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '320px 1fr', overflow: 'hidden', background: 'white' }}>
-      {/* Conversations list */}
+      {/* Lista de conversaciones */}
       <div style={{ borderRight: '1px solid #EFEAEE', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <div style={{ padding: '14px 16px', borderBottom: '1px solid #EFEAEE' }}>
-          <Input icon={<IconSearch />} placeholder="Buscar conversación…" value={search} onChange={(e) => setSearch(e.target.value)} />
+          <Input icon={<IconSearch />} placeholder="Buscar por nombre o teléfono…" value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
         <div style={{ flex: 1, overflow: 'auto' }}>
-          {filteredMensajes.length === 0 && <div style={{ padding: '40px 16px', textAlign: 'center', color: '#999', fontSize: 13 }}>Sin resultados</div>}
-          {filteredMensajes.map(m => {
-            const c = CLIENTS.find(cl => cl.id === m.clientId);
-            const isActive = active === m.id;
+          {filtered.length === 0 && <div style={{ padding: '40px 16px', textAlign: 'center', color: '#999', fontSize: 13 }}>Sin resultados</div>}
+          {filtered.map(p => {
+            const isActive = activeId === p.id;
             return (
-              <div key={m.id} onClick={() => setActive(m.id)} style={{
-                padding: '12px 16px', display: 'flex', gap: 10, cursor: 'pointer',
-                background: isActive ? '#FAF1F7' : 'white',
-                borderLeft: isActive ? '3px solid #A3007B' : '3px solid transparent',
-                transition: 'background .1s',
-              }}
-              onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.background = '#FAFAF8'; }}
-              onMouseLeave={(e) => { if (!isActive) e.currentTarget.style.background = 'white'; }}>
+              <div key={p.id} onClick={() => setActiveId(p.id)} style={{ padding: '12px 16px', display: 'flex', gap: 10, cursor: 'pointer', background: isActive ? '#FAF1F7' : 'white', borderLeft: isActive ? '3px solid #A3007B' : '3px solid transparent', transition: 'background .1s' }}
+                onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.background = '#FAFAF8'; }}
+                onMouseLeave={(e) => { if (!isActive) e.currentTarget.style.background = 'white'; }}>
                 <div style={{ position: 'relative' }}>
-                  <Avatar name={c?.name || ''} size={42} />
-                  {m.online && <div style={{ position: 'absolute', bottom: 0, right: 0, width: 11, height: 11, background: '#1F8A5B', borderRadius: '50%', border: '2px solid white' }} />}
+                  <Avatar name={p.nombre || ''} size={42} />
+                  <div style={{ position: 'absolute', bottom: 0, right: 0, width: 11, height: 11, background: '#25D366', borderRadius: '50%', border: '2px solid white' }} />
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: 13.5, fontWeight: m.unread > 0 ? 700 : 600 }}>{c?.name}</span>
-                    <span style={{ fontSize: 10, color: m.unread > 0 ? '#A3007B' : '#999', fontWeight: m.unread > 0 ? 700 : 500 }}>{m.time}</span>
+                    <span style={{ fontSize: 13.5, fontWeight: 600 }}>{p.nombre}</span>
+                    <span style={{ fontSize: 10, color: '#25D366', fontWeight: 700 }}>WA</span>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 2 }}>
-                    <span style={{ fontSize: 12, color: m.unread > 0 ? '#333' : '#888', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1, fontWeight: m.unread > 0 ? 600 : 400 }}>{m.lastMsg}</span>
-                    {m.unread > 0 && <span style={{ background: '#A3007B', color: 'white', fontSize: 10, fontWeight: 700, borderRadius: 10, padding: '1px 6px', minWidth: 16, textAlign: 'center', marginLeft: 6 }}>{m.unread}</span>}
-                  </div>
+                  <div style={{ fontSize: 12, color: '#888', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.telefono || 'Sin teléfono'}</div>
                 </div>
               </div>
             );
@@ -3685,85 +3932,88 @@ const MensajesView = ({ initialClientId }) => {
         </div>
       </div>
 
-      {/* Chat panel */}
+      {/* Panel de chat */}
       <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#FAF7FA' }}>
-        <div style={{ padding: '12px 20px', borderBottom: '1px solid #EFEAEE', display: 'flex', alignItems: 'center', gap: 12, background: 'white' }}>
-          <Avatar name={client?.name || ''} size={40} />
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 14, fontWeight: 700 }}>{client?.name}</div>
-            <div style={{ fontSize: 11, color: '#1F8A5B', display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ width: 6, height: 6, background: '#1F8A5B', borderRadius: '50%' }} /> en línea · WhatsApp</div>
-          </div>
-          <Btn variant="secondary" size="sm" icon={<IconPhone />}>Llamar</Btn>
-          <Btn variant="secondary" size="sm" icon={<IconPaw />}>Ver paciente</Btn>
-        </div>
-        <div style={{ flex: 1, overflow: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <div style={{ textAlign: 'center', fontSize: 11, color: '#999', margin: '4px 0 12px' }}>Hoy</div>
-          {chatLog.map((m, i) => (
-            <div key={i} style={{ display: 'flex', justifyContent: m.from === 'me' ? 'flex-end' : 'flex-start' }}>
-              <div style={{
-                maxWidth: '60%', padding: m.img || m.file ? 4 : '10px 14px', borderRadius: 14,
-                background: m.from === 'me' ? '#A3007B' : 'white',
-                color: m.from === 'me' ? 'white' : '#1A1A1A',
-                fontSize: 13.5, lineHeight: 1.5,
-                borderTopLeftRadius: m.from === 'client' ? 4 : 14,
-                borderTopRightRadius: m.from === 'me' ? 4 : 14,
-                boxShadow: m.from === 'client' ? '0 1px 2px rgba(0,0,0,0.04)' : 'none',
-              }}>
-                {m.img ? (
-                  <div style={{ width: 200, height: 140, borderRadius: 10, background: 'repeating-linear-gradient(45deg, #E5E0E5 0 6px, #EFEAEE 6px 12px)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#888', fontSize: 11 }}>🖼 {m.imgName || 'imagen.jpg'}</div>
-                ) : m.file ? (
-                  <div style={{ padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10, borderRadius: 10, background: m.from === 'me' ? 'rgba(255,255,255,0.15)' : '#F4F0F2', minWidth: 180 }}>
-                    <div style={{ fontSize: 24 }}>{m.fileIcon || '📎'}</div>
-                    <div>
-                      <div style={{ fontSize: 12.5, fontWeight: 600 }}>{m.fileName}</div>
-                      <div style={{ fontSize: 10, opacity: 0.7 }}>{m.fileSize}</div>
-                    </div>
-                  </div>
-                ) : m.text}
-                <div style={{ fontSize: 10, opacity: 0.7, marginTop: 3, textAlign: 'right', padding: m.img || m.file ? '0 8px 4px' : 0 }}>{m.time} {m.from === 'me' && '✓✓'}</div>
+        {activePac ? (
+          <>
+            <div style={{ padding: '12px 20px', borderBottom: '1px solid #EFEAEE', display: 'flex', alignItems: 'center', gap: 12, background: 'white' }}>
+              <Avatar name={activePac.nombre || ''} size={40} />
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 14, fontWeight: 700 }}>{activePac.nombre}</div>
+                <div style={{ fontSize: 11, color: '#25D366', display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span style={{ width: 6, height: 6, background: '#25D366', borderRadius: '50%' }} /> WhatsApp · {activePac.telefono || '—'}
+                </div>
               </div>
             </div>
-          ))}
-        </div>
-        {/* Input bar */}
-        <div style={{ padding: '10px 14px', borderTop: '1px solid #EFEAEE', background: 'white' }}>
-          {showEmoji && (
-            <div style={{ marginBottom: 8, padding: '10px 12px', background: '#FAF7FA', borderRadius: 12, border: '1px solid #EFEAEE', display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              {['😊','😂','🙏','❤️','👍','🐾','🐕','🐈','💊','✅','⚠️','📋','🔔','👋','😔','🤗','💪','🎉','😅','🥰'].map(e => (
-                <button key={e} onClick={() => { setDraft(d => d + e); setShowEmoji(false); }} style={{ background: 'transparent', border: 'none', fontSize: 22, cursor: 'pointer', padding: 2, borderRadius: 4, lineHeight: 1 }}>{e}</button>
-              ))}
+            <div style={{ flex: 1, overflow: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {loadingMsgs && <div style={{ textAlign: 'center', fontSize: 12, color: '#BBB', padding: 24 }}>Cargando mensajes…</div>}
+              {waError && !loadingMsgs && (
+                <div style={{ textAlign: 'center', fontSize: 12, color: '#D97706', background: '#FFF9F0', border: '1px solid #FFE4B0', borderRadius: 8, padding: '10px 16px', margin: '8px 0' }}>
+                  ⚠️ {waError}
+                </div>
+              )}
+              {!loadingMsgs && !waError && messages.length === 0 && (
+                <div style={{ textAlign: 'center', fontSize: 12, color: '#BBB', padding: 40 }}>Sin mensajes aún</div>
+              )}
+              {messages.map((m, i) => {
+                const isMe = m.direction === 'outbound';
+                const isMedia = m.type === 'IMAGE' || m.type === 'DOCUMENT' || m._icon;
+                return (
+                  <div key={m.id || i} style={{ display: 'flex', justifyContent: isMe ? 'flex-end' : 'flex-start' }}>
+                    <div style={{ maxWidth: '60%', padding: isMedia ? 4 : '10px 14px', borderRadius: 14, background: isMe ? '#A3007B' : 'white', color: isMe ? 'white' : '#1A1A1A', fontSize: 13.5, lineHeight: 1.5, borderTopLeftRadius: !isMe ? 4 : 14, borderTopRightRadius: isMe ? 4 : 14, boxShadow: !isMe ? '0 1px 2px rgba(0,0,0,0.04)' : 'none' }}>
+                      {m.type === 'IMAGE' && m.imageUrl ? (
+                        <img src={m.imageUrl} style={{ maxWidth: 200, borderRadius: 10, display: 'block' }} alt="imagen" onError={(e) => { e.target.style.display='none'; }} />
+                      ) : m.type === 'IMAGE' && !m.imageUrl ? (
+                        <div style={{ width: 200, height: 120, borderRadius: 10, background: '#E5E0E5', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#888', fontSize: 22 }}>🖼</div>
+                      ) : (m.type === 'DOCUMENT' || m._icon) ? (
+                        <div style={{ padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10, borderRadius: 10, background: isMe ? 'rgba(255,255,255,0.15)' : '#F4F0F2', minWidth: 180 }}>
+                          <div style={{ fontSize: 24 }}>{m._icon || '📎'}</div>
+                          <div><div style={{ fontSize: 12.5, fontWeight: 600 }}>{m.text || 'archivo'}</div><div style={{ fontSize: 10, opacity: 0.7 }}>{m._size || (m.documentUrl ? 'documento' : '')}</div></div>
+                          {m.documentUrl && <a href={m.documentUrl} target="_blank" rel="noreferrer" style={{ marginLeft: 'auto', color: isMe ? 'rgba(255,255,255,0.8)' : '#A3007B', fontSize: 10, fontWeight: 600, textDecoration: 'none' }}>Ver</a>}
+                        </div>
+                      ) : m.type === 'AUDIO' ? (
+                        <div style={{ padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 8, minWidth: 160 }}>
+                          <span>🎙</span><span style={{ fontSize: 12 }}>{m.transcript || m.text || 'Audio'}</span>
+                        </div>
+                      ) : (m.text || '')}
+                      <div style={{ fontSize: 10, opacity: 0.7, marginTop: 3, textAlign: 'right', padding: isMedia ? '0 8px 4px' : 0 }}>
+                        {formatTime(m.timestamp)} {isMe && '✓✓'}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+              <div ref={bottomRef} />
             </div>
-          )}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            {/* Clip — archivos */}
-            <label title="Adjuntar archivo" style={{ cursor: 'pointer', color: '#888', display: 'flex', padding: 6 }}>
-              <input type="file" accept=".pdf,.doc,.docx,.mp4,.mov,.avi,.xlsx,.pptx" style={{ display: 'none' }} onChange={(e) => {
-                const f = e.target.files[0];
-                if (!f) return;
-                const icons = { pdf: '📄', doc: '📝', docx: '📝', mp4: '🎥', mov: '🎥', avi: '🎥', xlsx: '📊', pptx: '📊' };
-                const ext = f.name.split('.').pop().toLowerCase();
-                const kb = (f.size / 1024).toFixed(0);
-                setChatLogs({ ...chatLogs, [active]: [...chatLog, { from: 'me', file: true, fileName: f.name, fileIcon: icons[ext] || '📎', fileSize: kb + ' KB', time: 'ahora' }] });
-                e.target.value = '';
-              }} />
-              <IconPaperclip size={20} />
-            </label>
-            {/* Imagen */}
-            <label title="Enviar imagen" style={{ cursor: 'pointer', color: '#888', display: 'flex', padding: 6 }}>
-              <input type="file" accept="image/jpeg,image/png" style={{ display: 'none' }} onChange={(e) => {
-                const f = e.target.files[0];
-                if (!f) return;
-                setChatLogs({ ...chatLogs, [active]: [...chatLog, { from: 'me', img: true, imgName: f.name, time: 'ahora' }] });
-                e.target.value = '';
-              }} />
-              <IconImage size={20} />
-            </label>
-            {/* Emoji */}
-            <button onClick={() => setShowEmoji(v => !v)} style={{ background: showEmoji ? '#FAF1F7' : 'transparent', border: 'none', color: showEmoji ? '#A3007B' : '#888', cursor: 'pointer', padding: 6, display: 'flex', borderRadius: 6 }}><IconSmile size={20} /></button>
-            <input value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && send()} placeholder="Escribir mensaje…" style={{ flex: 1, height: 38, padding: '0 14px', border: '1px solid #E0DCE0', borderRadius: 999, fontSize: 13.5, fontFamily: 'inherit', outline: 'none' }} />
-            <button onClick={send} style={{ width: 40, height: 40, borderRadius: '50%', background: '#A3007B', color: 'white', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><IconSend size={18} /></button>
+            {/* Barra de input */}
+            <div style={{ padding: '10px 14px', borderTop: '1px solid #EFEAEE', background: 'white' }}>
+              {showEmoji && (
+                <div style={{ marginBottom: 8, padding: '10px 12px', background: '#FAF7FA', borderRadius: 12, border: '1px solid #EFEAEE', display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {['😊','😂','🙏','❤️','👍','🐾','🐕','🐈','💊','✅','⚠️','📋','🔔','👋','😔','🤗','💪','🎉','😅','🥰'].map(e => (
+                    <button key={e} onClick={() => { setDraft(d => d + e); setShowEmoji(false); }} style={{ background: 'transparent', border: 'none', fontSize: 22, cursor: 'pointer', padding: 2, borderRadius: 4, lineHeight: 1 }}>{e}</button>
+                  ))}
+                </div>
+              )}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <label title="Adjuntar documento" style={{ cursor: 'pointer', color: '#888', display: 'flex', padding: 6 }}>
+                  <input type="file" accept=".pdf,.doc,.docx,.mp4,.mov,.xlsx,.pptx" style={{ display: 'none' }} onChange={(e) => { const f = e.target.files[0]; if (!f) return; sendMedia(f); e.target.value = ''; }} />
+                  <IconPaperclip size={20} />
+                </label>
+                <label title="Enviar imagen" style={{ cursor: 'pointer', color: '#888', display: 'flex', padding: 6 }}>
+                  <input type="file" accept="image/jpeg,image/png,image/webp" style={{ display: 'none' }} onChange={(e) => { const f = e.target.files[0]; if (!f) return; sendMedia(f); e.target.value = ''; }} />
+                  <IconImage size={20} />
+                </label>
+                <button onClick={() => setShowEmoji(v => !v)} style={{ background: showEmoji ? '#FAF1F7' : 'transparent', border: 'none', color: showEmoji ? '#A3007B' : '#888', cursor: 'pointer', padding: 6, display: 'flex', borderRadius: 6 }}><IconSmile size={20} /></button>
+                <input value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && send()} placeholder="Escribir mensaje…" style={{ flex: 1, height: 38, padding: '0 14px', border: '1px solid #E0DCE0', borderRadius: 999, fontSize: 13.5, fontFamily: 'inherit', outline: 'none' }} />
+                <button onClick={send} disabled={sending || !draft.trim()} style={{ width: 40, height: 40, borderRadius: '50%', background: '#A3007B', color: 'white', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: sending || !draft.trim() ? 0.5 : 1 }}><IconSend size={18} /></button>
+              </div>
+            </div>
+          </>
+        ) : (
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ fontSize: 13, color: '#BBB' }}>Seleccioná una conversación</div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
@@ -4582,58 +4832,195 @@ window.GoogleConfigModal = GoogleConfigModal;
 
 <script type="text/babel">
 // configuracion.jsx — Gestión de usuarios y roles (solo admin)
+const DIAS_SEMANA = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo'];
+const DIAS_LABEL = { lunes: 'Lun', martes: 'Mar', 'miércoles': 'Mié', jueves: 'Jue', viernes: 'Vie', 'sábado': 'Sáb', domingo: 'Dom' };
+
 const ConfiguracionView = ({ currentUser }) => {
+  const isAdmin = window.Auth.getRole() === 'admin';
+  const ROL_COLOR = { admin: '#A3007B', veterinario: '#1F8A5B', recepcion: '#D97706' };
+
+  // ── Usuarios ──
   const [usuarios, setUsuarios] = React.useState([]);
   const [roles, setRoles] = React.useState([]);
-  const [saving, setSaving] = React.useState(null);
   const [msg, setMsg] = React.useState('');
+  const [editUsr, setEditUsr] = React.useState(null); // { id, nombre, email, nuevaContrasena, rolID }
+  const [showNuevo, setShowNuevo] = React.useState(false);
+  const [nuevoUsr, setNuevoUsr] = React.useState({ nombre: '', email: '', contrasena: '', rolID: '' });
+  const [savingUsr, setSavingUsr] = React.useState(false);
+
+  const recargarUsuarios = () => window.Auth.get('/usuarios').then(setUsuarios).catch(() => {});
 
   React.useEffect(() => {
-    window.Auth.get('/usuarios').then(setUsuarios).catch(() => {});
+    recargarUsuarios();
     window.Auth.get('/roles').then(setRoles).catch(() => {});
   }, []);
 
-  const asignarRol = async (usuarioId, rolID) => {
-    setSaving(usuarioId);
+  const getRolNombre = (u) => u.rol || u.roles?.[0]?.nombre || '—';
+
+  const guardarEdicion = async () => {
+    if (!editUsr) return;
+    setSavingUsr(true);
     try {
-      await window.Auth.put(`/usuarios/${usuarioId}/roles`, { rolID: parseInt(rolID) });
-      setMsg('Rol actualizado');
+      const body = {};
+      if (editUsr.nombre) body.nombre = editUsr.nombre;
+      if (editUsr.email) body.email = editUsr.email;
+      if (editUsr.nuevaContrasena) body.contrasena = editUsr.nuevaContrasena;
+      await window.Auth.put(`/usuarios/${editUsr.id}`, body);
+      if (editUsr.rolID) {
+        await window.Auth.put(`/usuarios/${editUsr.id}/roles`, { rolID: parseInt(editUsr.rolID) });
+      }
+      setMsg('Usuario actualizado');
       setTimeout(() => setMsg(''), 2500);
-    } catch { setMsg('Error al guardar'); }
-    setSaving(null);
+      setEditUsr(null);
+      recargarUsuarios();
+    } catch (e) { setMsg('Error al guardar'); }
+    setSavingUsr(false);
   };
 
-  const ROL_COLOR = { admin: '#A3007B', veterinario: '#1F8A5B', recepcion: '#D97706' };
+  const crearUsuario = async () => {
+    if (!nuevoUsr.nombre || !nuevoUsr.email || !nuevoUsr.contrasena) return;
+    setSavingUsr(true);
+    try {
+      await window.Auth.post('/usuarios', { nombre: nuevoUsr.nombre, email: nuevoUsr.email, contrasena: nuevoUsr.contrasena, rolID: nuevoUsr.rolID ? parseInt(nuevoUsr.rolID) : undefined });
+      setMsg('Usuario creado correctamente');
+      setTimeout(() => setMsg(''), 2500);
+      setShowNuevo(false);
+      setNuevoUsr({ nombre: '', email: '', contrasena: '', rolID: '' });
+      recargarUsuarios();
+    } catch (e) { setMsg(e?.message?.includes('409') ? 'Ya existe un usuario con ese email' : 'Error al crear usuario'); }
+    setSavingUsr(false);
+  };
+
+  // ── Horarios ──
+  const [profesionales, setProfesionales] = React.useState([]);
+  const [selectedProfId, setSelectedProfId] = React.useState(null);
+  const [horarios, setHorarios] = React.useState([]);
+  const [savingHorarios, setSavingHorarios] = React.useState(false);
+  const [horariosMsg, setHorariosMsg] = React.useState('');
+  const [editHorario, setEditHorario] = React.useState(null);
+
+  React.useEffect(() => {
+    window.Auth.get('/profesionales').then(res => {
+      const list = Array.isArray(res) ? res : (res.data || []);
+      setProfesionales(list);
+      if (list.length > 0) setSelectedProfId(list[0].id);
+    }).catch(() => {});
+  }, []);
+
+  React.useEffect(() => {
+    if (!selectedProfId) return;
+    window.Auth.get(`/horarios?profesionalID=${selectedProfId}`).then(res => {
+      setHorarios(Array.isArray(res) ? res : (res.data || []));
+    }).catch(() => setHorarios([]));
+  }, [selectedProfId]);
+
+  const guardarHorarios = async () => {
+    if (!selectedProfId) return;
+    setSavingHorarios(true);
+    try {
+      await window.Auth.post('/horarios/masivo', { profesionalID: selectedProfId, horarios });
+      setHorariosMsg('Horarios guardados');
+      setTimeout(() => setHorariosMsg(''), 2500);
+    } catch { setHorariosMsg('Error al guardar horarios'); }
+    setSavingHorarios(false);
+  };
+
+  const agregarSlot = () => {
+    if (!editHorario?.diaSemana || !editHorario.horaInicio || !editHorario.horaFin) return;
+    setHorarios(prev => [...prev, { diaSemana: editHorario.diaSemana, horaInicio: editHorario.horaInicio, horaFin: editHorario.horaFin }]);
+    setEditHorario(null);
+  };
+
+  const inpStyle = { height: 36, padding: '0 10px', border: '1px solid #E0DCE0', borderRadius: 8, fontSize: 13, fontFamily: 'inherit', outline: 'none', width: '100%', boxSizing: 'border-box' };
 
   return (
     <div style={{ padding: 28, flex: 1, overflow: 'auto' }}>
-      <div style={{ maxWidth: 760 }}>
-        <div style={{ marginBottom: 20 }}>
-          <div style={{ fontSize: 16, fontWeight: 700 }}>Usuarios y Roles</div>
-          <div style={{ fontSize: 13, color: '#888', marginTop: 4 }}>Asigná roles para controlar qué módulos puede ver cada usuario.</div>
-        </div>
-        {msg && <div style={{ marginBottom: 14, padding: '10px 14px', background: '#E8F5EE', borderRadius: 8, fontSize: 13, color: '#1F8A5B', fontWeight: 600 }}>{msg}</div>}
-        <div style={{ background: 'white', border: '1px solid #EFEAEE', borderRadius: 12, overflow: 'hidden' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 160px', padding: '10px 16px', background: '#FAFAF8', fontSize: 11, fontWeight: 700, color: '#666', letterSpacing: 0.4, textTransform: 'uppercase', borderBottom: '1px solid #EFEAEE' }}>
-            <div>Usuario</div><div>Email</div><div>Rol</div>
-          </div>
-          {usuarios.map(u => (
-            <div key={u.id} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 160px', padding: '12px 16px', borderBottom: '1px solid #F4F0F2', alignItems: 'center', fontSize: 13 }}>
-              <div style={{ fontWeight: 600 }}>{u.nombre}</div>
-              <div style={{ color: '#666', fontSize: 12 }}>{u.email}</div>
-              <select
-                defaultValue=""
-                onChange={(e) => { if (e.target.value) asignarRol(u.id, e.target.value); }}
-                disabled={saving === u.id || u.id === currentUser?.id}
-                style={{ height: 34, padding: '0 10px', borderRadius: 8, border: '1px solid #E0DCE0', fontSize: 12, fontFamily: 'inherit', outline: 'none', background: 'white', cursor: 'pointer' }}>
-                <option value="" disabled>{saving === u.id ? 'Guardando…' : 'Cambiar rol…'}</option>
-                {roles.map(r => <option key={r.id} value={r.id}>{r.nombre}</option>)}
-              </select>
+      <div style={{ maxWidth: 800 }}>
+
+        {/* ── Usuarios ── */}
+        <div style={{ marginBottom: 22 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+            <div>
+              <div style={{ fontSize: 16, fontWeight: 700 }}>Usuarios</div>
+              <div style={{ fontSize: 13, color: '#888', marginTop: 3 }}>Gestioná los accesos a la plataforma. Solo el admin puede editar credenciales y crear usuarios.</div>
             </div>
-          ))}
-          {usuarios.length === 0 && <div style={{ padding: '28px 16px', textAlign: 'center', color: '#999', fontSize: 13 }}>No hay usuarios registrados</div>}
+            {isAdmin && <button onClick={() => { setShowNuevo(true); setEditUsr(null); }} style={{ height: 38, padding: '0 18px', borderRadius: 10, background: '#A3007B', border: 'none', color: 'white', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 6 }}>+ Nuevo usuario</button>}
+          </div>
+
+          {msg && <div style={{ marginBottom: 12, padding: '10px 14px', background: msg.includes('Error') || msg.includes('existe') ? '#FEF2F4' : '#E8F5EE', borderRadius: 8, fontSize: 13, color: msg.includes('Error') || msg.includes('existe') ? '#C2185B' : '#1F8A5B', fontWeight: 600 }}>{msg}</div>}
+
+          {/* Formulario nuevo usuario */}
+          {showNuevo && isAdmin && (
+            <div style={{ background: '#FAF7FA', border: '1px solid #E5C5DC', borderRadius: 12, padding: 18, marginBottom: 14 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12, color: '#A3007B' }}>Nuevo usuario</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+                <div><div style={{ fontSize: 11.5, fontWeight: 600, color: '#666', marginBottom: 4 }}>Nombre</div><input style={inpStyle} value={nuevoUsr.nombre} onChange={e => setNuevoUsr({...nuevoUsr, nombre: e.target.value})} placeholder="Nombre completo" /></div>
+                <div><div style={{ fontSize: 11.5, fontWeight: 600, color: '#666', marginBottom: 4 }}>Email</div><input style={inpStyle} type="email" value={nuevoUsr.email} onChange={e => setNuevoUsr({...nuevoUsr, email: e.target.value})} placeholder="usuario@email.com" /></div>
+                <div><div style={{ fontSize: 11.5, fontWeight: 600, color: '#666', marginBottom: 4 }}>Contraseña</div><input style={inpStyle} type="password" value={nuevoUsr.contrasena} onChange={e => setNuevoUsr({...nuevoUsr, contrasena: e.target.value})} placeholder="Mínimo 6 caracteres" /></div>
+                <div><div style={{ fontSize: 11.5, fontWeight: 600, color: '#666', marginBottom: 4 }}>Rol</div>
+                  <select value={nuevoUsr.rolID} onChange={e => setNuevoUsr({...nuevoUsr, rolID: e.target.value})} style={{ ...inpStyle, cursor: 'pointer' }}>
+                    <option value="">Sin rol asignado</option>
+                    {roles.map(r => <option key={r.id} value={r.id}>{r.nombre}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={crearUsuario} disabled={savingUsr || !nuevoUsr.nombre || !nuevoUsr.email || !nuevoUsr.contrasena} style={{ height: 36, padding: '0 20px', borderRadius: 8, background: '#A3007B', border: 'none', color: 'white', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', opacity: savingUsr ? 0.6 : 1 }}>{savingUsr ? 'Guardando…' : 'Crear usuario'}</button>
+                <button onClick={() => setShowNuevo(false)} style={{ height: 36, padding: '0 16px', borderRadius: 8, background: 'transparent', border: '1px solid #E0DCE0', color: '#666', fontWeight: 600, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>Cancelar</button>
+              </div>
+            </div>
+          )}
+
+          {/* Lista de usuarios */}
+          <div style={{ background: 'white', border: '1px solid #EFEAEE', borderRadius: 12, overflow: 'hidden' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr 120px 40px', padding: '9px 16px', background: '#FAFAF8', fontSize: 10.5, fontWeight: 700, color: '#888', letterSpacing: 0.4, textTransform: 'uppercase', borderBottom: '1px solid #EFEAEE' }}>
+              <div>Nombre</div><div>Email</div><div>Rol</div><div></div>
+            </div>
+            {usuarios.map(u => {
+              const isEditing = editUsr?.id === u.id;
+              const rolNombre = getRolNombre(u);
+              return (
+                <div key={u.id} style={{ borderBottom: '1px solid #F4F0F2' }}>
+                  {!isEditing ? (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr 120px 40px', padding: '12px 16px', alignItems: 'center', fontSize: 13 }}>
+                      <div style={{ fontWeight: 600 }}>{u.nombre}</div>
+                      <div style={{ color: '#666', fontSize: 12 }}>{u.email}</div>
+                      <div>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: ROL_COLOR[rolNombre] || '#888', background: (ROL_COLOR[rolNombre] || '#888') + '18', borderRadius: 6, padding: '3px 9px', letterSpacing: 0.3, textTransform: 'capitalize' }}>{rolNombre}</span>
+                      </div>
+                      <div>
+                        {isAdmin && <button onClick={() => { setShowNuevo(false); setEditUsr({ id: u.id, nombre: u.nombre, email: u.email, nuevaContrasena: '', rolID: '' }); }} style={{ height: 28, width: 28, borderRadius: 6, background: 'transparent', border: '1px solid #E0DCE0', color: '#888', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}>✏️</button>}
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ padding: '14px 16px', background: '#FAF7FA' }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: '#A3007B', marginBottom: 10 }}>Editando: {u.nombre}</div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+                        <div><div style={{ fontSize: 11.5, fontWeight: 600, color: '#666', marginBottom: 4 }}>Nombre</div><input style={inpStyle} value={editUsr.nombre} onChange={e => setEditUsr({...editUsr, nombre: e.target.value})} /></div>
+                        <div><div style={{ fontSize: 11.5, fontWeight: 600, color: '#666', marginBottom: 4 }}>Email</div><input style={inpStyle} type="email" value={editUsr.email} onChange={e => setEditUsr({...editUsr, email: e.target.value})} /></div>
+                        <div><div style={{ fontSize: 11.5, fontWeight: 600, color: '#666', marginBottom: 4 }}>Nueva contraseña <span style={{ fontWeight: 400, color: '#AAA' }}>(dejar vacío para no cambiar)</span></div><input style={inpStyle} type="password" value={editUsr.nuevaContrasena} onChange={e => setEditUsr({...editUsr, nuevaContrasena: e.target.value})} placeholder="••••••" /></div>
+                        <div><div style={{ fontSize: 11.5, fontWeight: 600, color: '#666', marginBottom: 4 }}>Rol</div>
+                          <select value={editUsr.rolID} onChange={e => setEditUsr({...editUsr, rolID: e.target.value})} style={{ ...inpStyle, cursor: 'pointer' }}>
+                            <option value="">No cambiar rol</option>
+                            {roles.map(r => <option key={r.id} value={r.id}>{r.nombre}</option>)}
+                          </select>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <button onClick={guardarEdicion} disabled={savingUsr} style={{ height: 34, padding: '0 18px', borderRadius: 8, background: '#A3007B', border: 'none', color: 'white', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', opacity: savingUsr ? 0.6 : 1 }}>{savingUsr ? 'Guardando…' : 'Guardar cambios'}</button>
+                        <button onClick={() => setEditUsr(null)} style={{ height: 34, padding: '0 14px', borderRadius: 8, background: 'transparent', border: '1px solid #E0DCE0', color: '#666', fontWeight: 600, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>Cancelar</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+            {usuarios.length === 0 && <div style={{ padding: '28px 16px', textAlign: 'center', color: '#999', fontSize: 13 }}>No hay usuarios</div>}
+          </div>
         </div>
-        <div style={{ marginTop: 28, padding: '16px 20px', background: '#FAF1F7', borderRadius: 12, border: '1px solid #E5C5DC' }}>
+
+        {/* ── Permisos por rol ── */}
+        <div style={{ marginBottom: 32, padding: '16px 20px', background: '#FAF1F7', borderRadius: 12, border: '1px solid #E5C5DC' }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: '#A3007B', marginBottom: 8 }}>Permisos por rol</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, fontSize: 12 }}>
             {Object.entries({ admin: ['Todo el sistema + Configuración'], veterinario: ['Dashboard, Agenda, Pacientes,', 'Consultas, Libreta, Internación,', 'Mensajes'], recepcion: ['Dashboard, Agenda,', 'Clientes, Mensajes'] }).map(([rol, lines]) => (
@@ -4643,6 +5030,69 @@ const ConfiguracionView = ({ currentUser }) => {
               </div>
             ))}
           </div>
+        </div>
+
+        {/* ── Horarios por veterinario ── */}
+        <div>
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 16, fontWeight: 700 }}>Horarios de atención</div>
+            <div style={{ fontSize: 13, color: '#888', marginTop: 4 }}>Configurá los días y horarios de trabajo de cada veterinario. Se guardan en la base de datos.</div>
+          </div>
+
+          {profesionales.length === 0 && <div style={{ fontSize: 13, color: '#AAA' }}>No hay profesionales registrados. Creá uno desde la agenda.</div>}
+
+          {profesionales.length > 0 && (
+            <>
+              <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+                {profesionales.map(p => (
+                  <button key={p.id} onClick={() => setSelectedProfId(p.id)} style={{ padding: '8px 16px', borderRadius: 999, border: selectedProfId === p.id ? '2px solid #A3007B' : '1px solid #E0DCE0', background: selectedProfId === p.id ? '#FAF1F7' : 'white', color: selectedProfId === p.id ? '#A3007B' : '#555', fontWeight: 600, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>{p.nombre}</button>
+                ))}
+              </div>
+
+              <div style={{ background: 'white', border: '1px solid #EFEAEE', borderRadius: 12, overflow: 'hidden', marginBottom: 14 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '100px 1fr', padding: '9px 16px', background: '#FAFAF8', fontSize: 10.5, fontWeight: 700, color: '#888', letterSpacing: 0.4, textTransform: 'uppercase', borderBottom: '1px solid #EFEAEE' }}>
+                  <div>Día</div><div>Horarios</div>
+                </div>
+                {DIAS_SEMANA.map(dia => {
+                  const slots = horarios.filter(h => h.diaSemana === dia);
+                  return (
+                    <div key={dia} style={{ display: 'grid', gridTemplateColumns: '100px 1fr', padding: '10px 16px', borderBottom: '1px solid #F4F0F2', alignItems: 'center', minHeight: 44 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: slots.length > 0 ? '#1A1A1A' : '#CCC' }}>{DIAS_LABEL[dia] || dia}</div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                        {slots.length === 0 && <span style={{ fontSize: 12, color: '#CCC' }}>Sin horario</span>}
+                        {slots.map((s, i) => (
+                          <span key={i} style={{ fontSize: 12, fontWeight: 600, background: '#EAF5F0', color: '#1F8A5B', borderRadius: 6, padding: '3px 10px', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                            {s.horaInicio?.slice(0,5)} – {s.horaFin?.slice(0,5)}
+                            <button onClick={() => setHorarios(prev => prev.filter((_, idx) => idx !== horarios.indexOf(s)))} style={{ background: 'none', border: 'none', color: '#1F8A5B', cursor: 'pointer', padding: 0, fontSize: 11 }}>✕</button>
+                          </span>
+                        ))}
+                        <button onClick={() => setEditHorario({ diaSemana: dia, horaInicio: '09:00', horaFin: '18:00' })} style={{ fontSize: 11.5, color: '#A3007B', background: 'transparent', border: '1px dashed #E0B0D5', borderRadius: 6, padding: '3px 10px', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600 }}>+ Agregar</button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {editHorario && (
+                <div style={{ background: '#FAF7FA', border: '1px solid #EFEAEE', borderRadius: 10, padding: '14px 16px', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: '#555', minWidth: 80 }}>{DIAS_LABEL[editHorario.diaSemana]}</span>
+                  <span style={{ fontSize: 12, color: '#888' }}>Desde</span>
+                  <input type="time" value={editHorario.horaInicio} onChange={e => setEditHorario({...editHorario, horaInicio: e.target.value})} style={{ height: 34, padding: '0 10px', border: '1px solid #E0DCE0', borderRadius: 8, fontSize: 13, fontFamily: 'inherit', outline: 'none' }} />
+                  <span style={{ fontSize: 12, color: '#888' }}>Hasta</span>
+                  <input type="time" value={editHorario.horaFin} onChange={e => setEditHorario({...editHorario, horaFin: e.target.value})} style={{ height: 34, padding: '0 10px', border: '1px solid #E0DCE0', borderRadius: 8, fontSize: 13, fontFamily: 'inherit', outline: 'none' }} />
+                  <button onClick={agregarSlot} style={{ height: 34, padding: '0 16px', borderRadius: 8, background: '#A3007B', border: 'none', color: 'white', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>Agregar</button>
+                  <button onClick={() => setEditHorario(null)} style={{ height: 34, padding: '0 12px', borderRadius: 8, background: 'transparent', border: '1px solid #E0DCE0', color: '#666', fontWeight: 600, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>Cancelar</button>
+                </div>
+              )}
+
+              {horariosMsg && <div style={{ marginBottom: 10, padding: '10px 14px', background: '#E8F5EE', borderRadius: 8, fontSize: 13, color: '#1F8A5B', fontWeight: 600 }}>{horariosMsg}</div>}
+
+              <button onClick={guardarHorarios} disabled={savingHorarios} style={{ height: 40, padding: '0 24px', borderRadius: 10, background: '#A3007B', border: 'none', color: 'white', fontWeight: 700, fontSize: 14, cursor: 'pointer', fontFamily: 'inherit', opacity: savingHorarios ? 0.6 : 1 }}>
+                {savingHorarios ? 'Guardando…' : 'Guardar horarios'}
+              </button>
+              <div style={{ fontSize: 11.5, color: '#999', marginTop: 8 }}>Los horarios se guardan en la base de datos y determinan la disponibilidad en la agenda.</div>
+            </>
+          )}
         </div>
       </div>
     </div>
@@ -4827,7 +5277,7 @@ const App = () => {
         {active === 'configuracion' && <window.ConfiguracionView currentUser={currentUser} />}
 
         {/* Drawers + modals (overlay this column only) */}
-        <ClientDrawer client={clientDrawer.client} open={clientDrawer.open} onClose={() => setClientDrawer({ ...clientDrawer, open: false })} goToPet={(p) => { setClientDrawer({ ...clientDrawer, open: false }); setPetDrawer({ open: true, pet: p }); }} goToMensajes={(c) => { const m = MENSAJES.find(msg => CLIENTS.find(cl => cl.id === msg.clientId)?.id === c.id); setMensajeClientId(m?.id || null); setActive('mensajes'); }} onSaved={() => setRefreshTick(t => t + 1)} />
+        <ClientDrawer client={clientDrawer.client} open={clientDrawer.open} onClose={() => setClientDrawer({ ...clientDrawer, open: false })} goToPet={(p) => { setClientDrawer({ ...clientDrawer, open: false }); setPetDrawer({ open: true, pet: p }); }} goToMensajes={(c) => { setMensajeClientId(c.id); setActive('mensajes'); }} onSaved={() => setRefreshTick(t => t + 1)} />
         <PetDrawer pet={petDrawer.pet} open={petDrawer.open} onClose={() => setPetDrawer({ ...petDrawer, open: false })} goToConsultas={() => setActive('consultas')} goToLibreta={(p) => { window._LIBRETA_PET_ID = p?.id; setActive('libreta'); }} />
         <NewConsultaModal open={newConsulta} onClose={() => setNewConsulta(false)} />
         <QuickSearchModal open={searchOpen} onClose={() => setSearchOpen(false)} openClient={(c) => { setSearchOpen(false); setClientDrawer({ open: true, client: c }); }} openPet={(p) => { setSearchOpen(false); setPetDrawer({ open: true, pet: p }); }} />

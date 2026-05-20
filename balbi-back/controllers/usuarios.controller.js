@@ -1,6 +1,32 @@
 const { Usuario, Rol, UsuarioRol } = require('../models');
 const { Op } = require('sequelize');
 
+// POST /api/usuarios — crear usuario desde admin
+const crearUsuario = async (req, res) => {
+  try {
+    const { nombre, email, contrasena, rolID } = req.body;
+    if (!nombre || !email || !contrasena) {
+      return res.status(400).json({ error: 'nombre, email y contrasena son requeridos' });
+    }
+    const existente = await Usuario.findOne({ where: { email } });
+    if (existente) return res.status(409).json({ error: 'Ya existe un usuario con ese email' });
+
+    const nuevo = await Usuario.create({ nombre, email, contrasena, estado: 'ACTIVO' });
+
+    if (rolID) {
+      const rol = await Rol.findByPk(rolID);
+      if (rol) await UsuarioRol.create({ usuarioID: nuevo.id, rolID, estado: 'ACTIVO' });
+    }
+
+    const respuesta = nuevo.toJSON();
+    delete respuesta.contrasena;
+    res.status(201).json(respuesta);
+  } catch (error) {
+    console.error('Error creando usuario:', error);
+    res.status(500).json({ error: 'Error al crear usuario' });
+  }
+};
+
 // GET /api/usuarios
 const listarUsuarios = async (req, res) => {
   try {
@@ -126,6 +152,7 @@ const asignarRol = async (req, res) => {
 };
 
 module.exports = {
+  crearUsuario,
   listarUsuarios,
   obtenerUsuario,
   actualizarUsuario,

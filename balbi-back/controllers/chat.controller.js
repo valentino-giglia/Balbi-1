@@ -163,27 +163,47 @@ const listarMensajes = async (req, res) => {
 
 const enviarMensaje = async (req, res) => {
   try {
-    const { phone_number_id, to, text } = req.body;
+    const { phone_number_id, to, text, type, mediaUrl, fileName, caption } = req.body;
 
     if (!KAPSO_API_KEY) {
       return res.status(500).json({ error: 'KAPSO_API_KEY no configurada' });
     }
 
-    if (!phone_number_id || !to || !text) {
-      return res.status(400).json({ error: 'phone_number_id, to y text son requeridos' });
+    if (!phone_number_id || !to) {
+      return res.status(400).json({ error: 'phone_number_id y to son requeridos' });
+    }
+
+    let payload;
+    if (type === 'document' && mediaUrl) {
+      payload = {
+        messaging_product: 'whatsapp',
+        recipient_type: 'individual',
+        to,
+        type: 'document',
+        document: { link: mediaUrl, caption: caption || fileName || '', filename: fileName || 'archivo' }
+      };
+    } else if (type === 'image' && mediaUrl) {
+      payload = {
+        messaging_product: 'whatsapp',
+        recipient_type: 'individual',
+        to,
+        type: 'image',
+        image: { link: mediaUrl, caption: caption || '' }
+      };
+    } else {
+      if (!text) return res.status(400).json({ error: 'text es requerido para mensajes de texto' });
+      payload = {
+        messaging_product: 'whatsapp',
+        recipient_type: 'individual',
+        to,
+        type: 'text',
+        text: { body: text }
+      };
     }
 
     const response = await axios.post(
       `${KAPSO_BASE_URL}/${phone_number_id}/messages`,
-      {
-        messaging_product: 'whatsapp',
-        recipient_type: 'individual',
-        to: to,
-        type: 'text',
-        text: {
-          body: text
-        }
-      },
+      payload,
       {
         headers: {
           'Content-Type': 'application/json',

@@ -5,6 +5,9 @@ const usuariosController = require('../controllers/usuarios.controller');
 // GET /api/usuarios
 router.get('/', usuariosController.listarUsuarios);
 
+// POST /api/usuarios — crear usuario (solo admin)
+router.post('/', usuariosController.crearUsuario);
+
 // GET /api/usuarios/:id
 router.get('/:id', usuariosController.obtenerUsuario);
 
