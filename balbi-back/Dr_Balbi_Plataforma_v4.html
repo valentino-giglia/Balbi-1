@@ -1236,17 +1236,11 @@ window.NAV = NAV;
 const { useState: useStateD, useEffect: useEffectD, useMemo: useMemoD } = React;
 
 const Dashboard = ({ goTo, openSearch }) => {
-  const _savedGuardia = (() => { try { return JSON.parse(localStorage.getItem('balbi_guardia') || '{}'); } catch { return {}; } })();
-  const [vets, setVets] = useStateD(_savedGuardia.vets || window.VETS_INIT);
-  const [guardias, setGuardias] = useStateD(_savedGuardia.guardias || window.GUARDIAS_INIT);
-  const [alertas, setAlertas] = useStateD(window.ALERTAS_INIT);
-  const [cola, setCola] = useStateD(window.COLA_INIT);
-  const _boxesToInternados = () => (window._INTERN_BOXES || []).map(b => ({
-    petId: b.petId, box: b.id,
-    estado: b.estado === 'crítico' ? 'critico' : b.estado === 'observación' ? 'observacion' : 'estable',
-    motivo: b.motivo || '', vetId: null, proxMed: '—', proxMin: 999
-  }));
-  const [internados, setInternados] = useStateD(() => _boxesToInternados());
+  const [vets, setVets] = useStateD([]);
+  const [guardias, setGuardias] = useStateD([]);
+  const [alertas, setAlertas] = useStateD([]);
+  const [cola, setCola] = useStateD([]);
+  const [internados, setInternados] = useStateD([]);
 
   const [editGuardia, setEditGuardia] = useStateD(null);
   const [editGuardias, setEditGuardias] = useStateD(false);
@@ -1255,51 +1249,25 @@ const Dashboard = ({ goTo, openSearch }) => {
   const [editCola, setEditCola] = useStateD(null);
   const [editInt, setEditInt] = useStateD(null);
 
-  // Persistir vets y guardias en localStorage
-  useEffectD(() => { localStorage.setItem('balbi_guardia', JSON.stringify({ vets, guardias })); }, [vets, guardias]);
+  // Helpers de mapeo API → estado local
+  const _mapVet = p => ({ id: p.id, name: p.nombre, role: p.codigo || '', color: p.color || '#A3007B', initials: p.nombre.split(' ').filter(Boolean).slice(0,2).map(s=>s[0]).join('').toUpperCase(), phone: p.telefono || '' });
+  const _mapGuardia = g => ({ id: g.id, vetId: g.profesionalID, tipo: g.tipo, fecha: g.fecha, desde: g.desde, hasta: g.hasta, activa: g.activa });
+  const _mapInternado = b => ({ id: b.id, petId: b.mascotaID, box: b.id, estado: b.estado === 'crítico' ? 'critico' : b.estado === 'observación' ? 'observacion' : 'estable', motivo: b.motivo || '', vetId: b.profesionalID, proxMed: '—', proxMin: 999 });
+  const _mapCola = c => ({ id: c.id, fromApi: true, petName: c.petName || '', species: c.species || 'Canino', ownerName: c.ownerName || '', motivo: c.motivo || '', triage: c.triage || 'verde', espera: c.espera || 0, primera: c.primera || false, llegada: c.llegada || '' });
 
-  // Sincronizar vets desde API de profesionales
+  const recargarVets = () => window.Auth.get('/profesionales?pageSize=100').then(r => { const l = Array.isArray(r)?r:(r.data||[]); setVets(l.map(_mapVet)); }).catch(()=>{});
+  const recargarGuardias = () => window.Auth.get('/guardias').then(r => { const l = Array.isArray(r)?r:(r.data||[]); setGuardias(l.map(_mapGuardia)); }).catch(()=>{});
+  const recargarAlertas = () => window.Auth.get('/alertas').then(r => { const l = Array.isArray(r)?r:(r.data||[]); setAlertas(l.map(a => ({ id: a.id, tipo: a.tipo, petName: a.petName||'', msg: a.msg||'', detalle: a.detalle||'', minutos: a.minutos||15, severity: a.severity||'info' }))); }).catch(()=>{});
+  const recargarCola = () => window.Auth.get('/cola').then(r => { const l = Array.isArray(r)?r:(r.data||[]); setCola(l.map(_mapCola)); }).catch(()=>{});
+  const recargarInternados = () => window.Auth.get('/internados').then(r => { const l = Array.isArray(r)?r:(r.data||[]); setInternados(l.map(_mapInternado)); }).catch(()=>{});
+
   useEffectD(() => {
     if (!window.Auth?.getToken()) return;
-    window.Auth.get('/profesionales?pageSize=100').then(res => {
-      const list = Array.isArray(res) ? res : (res.data || []);
-      if (list.length === 0) return;
-      const mapped = list.map(p => ({
-        id: p.id,
-        name: p.nombre,
-        role: p.codigo || '',
-        color: p.color || '#A3007B',
-        initials: p.nombre.split(' ').filter(Boolean).slice(0, 2).map(s => s[0]).join('').toUpperCase(),
-        phone: p.telefono || ''
-      }));
-      setVets(mapped);
-    }).catch(() => {});
+    recargarVets(); recargarGuardias(); recargarAlertas(); recargarCola(); recargarInternados();
   }, []);
   useEffectD(() => { window._goTo = goTo; }, [goTo]);
-  useEffectD(() => { const t = setInterval(() => setInternados(_boxesToInternados()), 2000); return () => clearInterval(t); }, []);
+  useEffectD(() => { const t = setInterval(() => { recargarInternados(); recargarCola(); }, 30000); return () => clearInterval(t); }, []);
 
-  const [_colaTick, _setColaTick] = useStateD(0);
-  useEffectD(() => {
-    if (!window.Auth?.getToken()) return;
-    const today = window.todayAR();
-    window.Auth.get('/turnos?fechaInicio=' + today + 'T00:00:00&fechaFin=' + today + 'T23:59:59').then(res => {
-      const raw = Array.isArray(res) ? res : (res.data || []);
-      const fromApi = raw.map(t => ({
-        id: 'turno-' + t.id, fromTurno: true,
-        petName: t.mascota?.nombre || 'Sin nombre',
-        species: t.mascota?.especie || 'Canino',
-        ownerName: t.paciente?.nombre || 'Sin registrar',
-        motivo: t.servicio?.nombre || t.notas || 'Consulta',
-        triage: 'verde', espera: 0, primera: false,
-        llegada: t.horaInicio ? new Date(new Date(t.horaInicio).getTime() - 3 * 60 * 60 * 1000).toISOString().slice(11, 16) : '00:00',
-      }));
-      setCola(prev => {
-        const manual = prev.filter(c => !c.fromTurno);
-        return [...manual, ...fromApi];
-      });
-    }).catch(() => {});
-  }, [_colaTick]);
-  useEffectD(() => { const t = setInterval(() => _setColaTick(n => n + 1), 60000); return () => clearInterval(t); }, []);
 
   const guardiaActiva = guardias.find(g => g.activa) || guardias[0];
   const vetActivo = vets.find(v => v.id === guardiaActiva?.vetId);
@@ -1386,7 +1354,7 @@ const Dashboard = ({ goTo, openSearch }) => {
         <ColaAtencion
           cola={cola}
           vets={vets}
-          onAtender={(item) => setCola(cola.filter(c => c.id !== item.id))}
+          onAtender={async (item) => { try { await window.Auth.put(`/cola/${item.id}/atender`, {}); recargarCola(); } catch {} }}
           onEdit={(item) => setEditCola(item)}
           onAdd={() => setEditCola({ id: null, petName: '', species: 'Canino', ownerName: '', motivo: '', triage: 'amarillo', espera: 0, primera: true, llegada: window.timeAR() })}
         />
@@ -1404,12 +1372,41 @@ const Dashboard = ({ goTo, openSearch }) => {
         📊 Las estadísticas y gráficos analíticos se movieron a <a onClick={() => goTo && goTo('agenda')} style={{ color: '#A3007B', cursor: 'pointer', fontWeight: 600 }}>Análisis</a> · Esta vista es operativa en tiempo real
       </div>
 
-      {editGuardia && <GuardiaModal guardia={editGuardia} vets={vets} onClose={() => setEditGuardia(null)} onSave={(g) => { if (guardias.some(x => x.id === g.id)) { setGuardias(guardias.map(x => x.id === g.id ? g : x)); } else { setGuardias([...guardias, { ...g, activa: true }]); } setEditGuardia(null); }} />}
-      {editGuardias && <GuardiasListModal guardias={guardias} vets={vets} onClose={() => setEditGuardias(false)} onSave={(lista) => { setGuardias(lista); setEditGuardias(false); }} />}
+      {editGuardia && <GuardiaModal guardia={editGuardia} vets={vets} onClose={() => setEditGuardia(null)} onSave={async (g) => {
+        try {
+          const body = { profesionalID: g.vetId, tipo: g.tipo, fecha: g.fecha, desde: g.desde, hasta: g.hasta, activa: g.activa || false };
+          if (g.id && g.id < 2000000000) { await window.Auth.put(`/guardias/${g.id}`, body); } else { await window.Auth.post('/guardias', body); }
+          recargarGuardias(); setEditGuardia(null);
+        } catch {}
+      }} />}
+      {editGuardias && <GuardiasListModal guardias={guardias} vets={vets} onClose={() => setEditGuardias(false)} onSave={async (lista) => {
+        const existentes = guardias.map(g => g.id);
+        const nuevas = lista.filter(g => !g.id || g.id >= 2000000000);
+        const actualizadas = lista.filter(g => g.id && g.id < 2000000000);
+        const eliminadas = existentes.filter(id => !lista.find(g => g.id === id));
+        await Promise.all([
+          ...nuevas.map(g => window.Auth.post('/guardias', { profesionalID: g.vetId, tipo: g.tipo, fecha: g.fecha, desde: g.desde, hasta: g.hasta, activa: g.activa||false })),
+          ...actualizadas.map(g => window.Auth.put(`/guardias/${g.id}`, { profesionalID: g.vetId, tipo: g.tipo, fecha: g.fecha, desde: g.desde, hasta: g.hasta, activa: g.activa||false })),
+          ...eliminadas.map(id => window.Auth.del(`/guardias/${id}`)),
+        ].map(p => p.catch(() => {})));
+        recargarGuardias(); setEditGuardias(false);
+      }} />}
       {editVets && <VetsModal vets={vets} onClose={() => setEditVets(false)} onSave={(vs) => { setVets(vs); setEditVets(false); }} />}
-      {editAlerta && <AlertaModal alerta={editAlerta} onClose={() => setEditAlerta(null)} onSave={(a) => { if (a.id) setAlertas(alertas.map(x => x.id === a.id ? a : x)); else setAlertas([...alertas, { ...a, id: Math.max(0, ...alertas.map(x=>x.id))+1 }]); setEditAlerta(null); }} onDelete={(id) => { setAlertas(alertas.filter(x => x.id !== id)); setEditAlerta(null); }} />}
-      {editCola && <ColaModal item={editCola} onClose={() => setEditCola(null)} onSave={(it) => { if (it.id) setCola(cola.map(x => x.id === it.id ? it : x)); else setCola([...cola, { ...it, id: Math.max(0, ...cola.map(x=>x.id))+1 }]); setEditCola(null); }} onDelete={(id) => { setCola(cola.filter(x => x.id !== id)); setEditCola(null); }} />}
-      {editInt && <InternadoModal item={editInt} vets={vets} onClose={() => setEditInt(null)} onSave={(it) => { setInternados(internados.map(x => x.petId === it.petId ? it : x)); setEditInt(null); }} />}
+      {editAlerta && <AlertaModal alerta={editAlerta} onClose={() => setEditAlerta(null)} onSave={async (a) => {
+        try {
+          if (a.id) { await window.Auth.put(`/alertas/${a.id}`, a); } else { await window.Auth.post('/alertas', a); }
+          recargarAlertas(); setEditAlerta(null);
+        } catch {}
+      }} onDelete={async (id) => { try { await window.Auth.del(`/alertas/${id}`); recargarAlertas(); setEditAlerta(null); } catch {} }} />}
+      {editCola && <ColaModal item={editCola} onClose={() => setEditCola(null)} onSave={async (it) => {
+        try {
+          if (it.id) { await window.Auth.put(`/cola/${it.id}`, it); } else { await window.Auth.post('/cola', it); }
+          recargarCola(); setEditCola(null);
+        } catch {}
+      }} onDelete={async (id) => { try { await window.Auth.del(`/cola/${id}`); recargarCola(); setEditCola(null); } catch {} }} />}
+      {editInt && <InternadoModal item={editInt} vets={vets} onClose={() => setEditInt(null)} onSave={async (it) => {
+        try { await window.Auth.put(`/internados/${it.id}`, { estado: it.estado, motivo: it.motivo, vetId: it.vetId }); recargarInternados(); setEditInt(null); } catch {}
+      }} />}
     </div>
   );
 };
@@ -2755,26 +2752,58 @@ window.PacientesView = PacientesView;
 const { useState: useStateD2 } = React;
 const useState = useStateD2;
 const InternacionView = () => {
-  const [boxes, setBoxes] = useState(() => window._INTERN_BOXES !== undefined ? window._INTERN_BOXES : window.BOXES_INIT);
-  React.useEffect(() => { window._INTERN_BOXES = boxes; }, [boxes]);
+  const [boxes, setBoxes] = useState([]);
   const [editing, setEditing] = useState(null);
   const [newBox, setNewBox] = useState(false);
   const [confirmAlta, setConfirmAlta] = useState(null);
 
-  const updateBox = (id, patch) => setBoxes(boxes.map(b => b.id === id ? { ...b, ...patch } : b));
-  const addControl = (boxId, control) => {
-    setBoxes(boxes.map(b => b.id === boxId ? { ...b, controles: [...b.controles, control] } : b));
+  const cargarInternados = () => {
+    if (!window.Auth?.getToken()) return;
+    window.Auth.get('/internados').then(r => {
+      const list = Array.isArray(r) ? r : (r.data || []);
+      setBoxes(list.map(b => ({ ...b, controles: Array.isArray(b.controles) ? b.controles : [] })));
+    }).catch(() => {});
+  };
+  React.useEffect(() => { cargarInternados(); }, []);
+
+  const updateBox = async (id, patch) => {
+    setBoxes(prev => prev.map(b => b.id === id ? { ...b, ...patch } : b));
+    try { await window.Auth.put(`/internados/${id}`, patch); } catch {}
+  };
+  const addControl = async (boxId, control) => {
+    const box = boxes.find(b => b.id === boxId);
+    if (!box) return;
+    const nuevosControles = [...(box.controles || []), control];
+    setBoxes(prev => prev.map(b => b.id === boxId ? { ...b, controles: nuevosControles } : b));
+    try { await window.Auth.put(`/internados/${boxId}`, { controles: nuevosControles }); } catch {}
     setEditing(null);
   };
-  const editControl = (boxId, idx, control) => {
-    setBoxes(boxes.map(b => b.id === boxId ? { ...b, controles: b.controles.map((r, i) => i === idx ? control : r) } : b));
+  const editControl = async (boxId, idx, control) => {
+    const box = boxes.find(b => b.id === boxId);
+    if (!box) return;
+    const nuevosControles = box.controles.map((r, i) => i === idx ? control : r);
+    setBoxes(prev => prev.map(b => b.id === boxId ? { ...b, controles: nuevosControles } : b));
+    try { await window.Auth.put(`/internados/${boxId}`, { controles: nuevosControles }); } catch {}
     setEditing(null);
   };
-  const deleteControl = (boxId, idx) => {
-    setBoxes(boxes.map(b => b.id === boxId ? { ...b, controles: b.controles.filter((_, i) => i !== idx) } : b));
+  const deleteControl = async (boxId, idx) => {
+    const box = boxes.find(b => b.id === boxId);
+    if (!box) return;
+    const nuevosControles = box.controles.filter((_, i) => i !== idx);
+    setBoxes(prev => prev.map(b => b.id === boxId ? { ...b, controles: nuevosControles } : b));
+    try { await window.Auth.put(`/internados/${boxId}`, { controles: nuevosControles }); } catch {}
   };
-  const dischargeBox = (id) => { setBoxes(boxes.filter(b => b.id !== id)); setConfirmAlta(null); };
-  const addBox = (data) => { setBoxes([...boxes, { ...data, id: Math.max(0, ...boxes.map(b => b.id)) + 1, controles: [] }]); setNewBox(false); };
+  const dischargeBox = async (id) => {
+    try { await window.Auth.put(`/internados/${id}/alta`, {}); setBoxes(prev => prev.filter(b => b.id !== id)); } catch {}
+    setConfirmAlta(null);
+  };
+  const addBox = async (data) => {
+    try {
+      const res = await window.Auth.post('/internados', { mascotaID: data.petId || data.mascotaID, profesionalID: data.profesionalID || null, estado: data.estado || 'estable', motivo: data.motivo, ingreso: data.ingreso || new Date().toISOString(), plan: data.plan, dieta: data.dieta, ubicacion: data.ubicacion || data.box });
+      setBoxes(prev => [...prev, { ...res, controles: [] }]);
+    } catch {}
+    setNewBox(false);
+  };
 
   return (
     <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16, overflow: 'auto', flex: 1 }}>
@@ -4560,7 +4589,7 @@ window.AgendaView = AgendaView;
 // precios.jsx
 // Precios — productos editables con cálculo de margen + sync Sheets
 const Precios = () => {
-  const [products, setProducts] = useState(() => window._PRECIOS_STATE || []);
+  const [products, setProducts] = useState([]);
   const [q, setQ] = useState('');
   const [cat, setCat] = useState('todos');
   const [editing, setEditing] = useState(null);
@@ -4571,7 +4600,13 @@ const Precios = () => {
   const [syncing, setSyncing] = useState(false);
   const [syncMsg, setSyncMsg] = useState('');
 
-  React.useEffect(() => { window._PRECIOS_STATE = products; }, [products]);
+  React.useEffect(() => {
+    if (!window.Auth?.getToken()) return;
+    window.Auth.get('/productos').then(r => {
+      const list = Array.isArray(r) ? r : (r.data || []);
+      setProducts(list);
+    }).catch(() => {});
+  }, []);
 
   React.useEffect(() => {
     if (!gsheetsToken) return;
@@ -4590,8 +4625,7 @@ const Precios = () => {
     return () => clearTimeout(timer);
   }, [products, gsheetsToken]);
 
-  const _configCats = (() => { try { return JSON.parse(localStorage.getItem('balbi_cats') || '[]'); } catch { return []; } })();
-  const cats = ['todos', ...Array.from(new Set([..._configCats, ...products.map(p => p.categoria).filter(Boolean)]))];
+  const cats = ['todos', ...Array.from(new Set(products.map(p => p.categoria).filter(Boolean)))];
   const filtered = products.filter(p => (cat === 'todos' || p.categoria === cat) && p.nombre.toLowerCase().includes(q.toLowerCase()));
 
   const margin = (costo, venta) => {
@@ -4599,15 +4633,31 @@ const Precios = () => {
     return ((venta - costo) / costo) * 100;
   };
 
-  const updateField = (id, field, value) => {
-    setProducts(products.map(p => p.id === id ? { ...p, [field]: field === 'nombre' || field === 'categoria' || field === 'unidad' || field === 'proveedor' ? value : (parseFloat(value) || 0) } : p));
+  const updateField = async (id, field, value) => {
+    const prod = products.find(p => p.id === id);
+    if (!prod) return;
+    const parsed = (field === 'nombre' || field === 'categoria' || field === 'unidad' || field === 'proveedor') ? value : (parseFloat(value) || 0);
+    const updated = { ...prod, [field]: parsed };
+    setProducts(products.map(p => p.id === id ? updated : p));
     setSaved(id + ':' + field); setTimeout(() => setSaved(null), 1500);
+    try {
+      await window.Auth.put(`/productos/${id}`, { nombre: updated.nombre, categoria: updated.categoria, costo: updated.costo, venta: updated.venta, stock: updated.stock, unidad: updated.unidad, proveedor: updated.proveedor });
+    } catch {}
   };
 
-  const removeRow = (id) => setProducts(products.filter(p => p.id !== id));
+  const removeRow = async (id) => {
+    if (!window.confirm('¿Eliminar este producto?')) return;
+    try {
+      await window.Auth.del(`/productos/${id}`);
+      setProducts(products.filter(p => p.id !== id));
+    } catch {}
+  };
 
-  const addNew = (data) => {
-    setProducts([...products, { ...data, id: Math.max(...products.map(p => p.id)) + 1 }]);
+  const addNew = async (data) => {
+    try {
+      const res = await window.Auth.post('/productos', { nombre: data.nombre, categoria: data.categoria || '', costo: data.costo || 0, venta: data.venta || 0, stock: data.stock ?? null, unidad: data.unidad || 'unidad', proveedor: data.proveedor || '' });
+      setProducts(prev => [...prev, res]);
+    } catch {}
     setShowNew(false);
   };
 
@@ -4762,7 +4812,7 @@ const EditableCell = ({ value, onSave, type = 'text', align = 'left', bold, mute
 };
 
 const NewProductModal = ({ onClose, onSave, cats }) => {
-  const [data, setData] = useState({ nombre: '', categoria: cats[0] || 'Servicios', costo: 0, venta: 0, stock: null, unidad: 'unidad', proveedor: '' });
+  const [data, setData] = useState({ nombre: '', categoria: cats[0] || '', costo: 0, venta: 0, stock: null, unidad: 'unidad', proveedor: '' });
   const m = data.costo > 0 ? ((data.venta - data.costo) / data.costo * 100) : null;
   return (
     <Modal open={true} onClose={onClose} title="Nuevo producto" footer={
@@ -4775,9 +4825,8 @@ const NewProductModal = ({ onClose, onSave, cats }) => {
         <Field label="Nombre"><Input autoFocus placeholder="Ej. Bravecto Plus felino" value={data.nombre} onChange={(e) => setData({ ...data, nombre: e.target.value })} /></Field>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
           <Field label="Categoría">
-            <select value={data.categoria} onChange={(e) => setData({ ...data, categoria: e.target.value })} style={{ height: 38, padding: '0 12px', borderRadius: 8, border: '1px solid #E0DCE0', fontSize: 14, fontFamily: 'inherit', outline: 'none' }}>
-              {cats.map(c => <option key={c}>{c}</option>)}
-            </select>
+            <datalist id="cats-list">{cats.map(c => <option key={c} value={c} />)}</datalist>
+            <input list="cats-list" value={data.categoria} onChange={(e) => setData({ ...data, categoria: e.target.value })} placeholder="Ej. Vacunas" style={{ height: 38, padding: '0 12px', borderRadius: 8, border: '1px solid #E0DCE0', fontSize: 14, fontFamily: 'inherit', outline: 'none', width: '100%', boxSizing: 'border-box' }} />
           </Field>
           <Field label="Unidad"><Input value={data.unidad} onChange={(e) => setData({ ...data, unidad: e.target.value })} /></Field>
         </div>
@@ -5188,24 +5237,15 @@ const ConfiguracionView = ({ currentUser }) => {
     try { await window.Auth.del(`/servicios/${id}`); recargarSrv(); } catch { setSrvMsg('Error al eliminar'); }
   };
 
-  // ── Categorías de precios ──
-  const [preciosCats, setPreciosCats] = React.useState(() => { try { return JSON.parse(localStorage.getItem('balbi_cats') || '[]'); } catch { return []; } });
-  const [nuevaCat, setNuevaCat] = React.useState('');
-
-  const agregarCat = () => {
-    const v = nuevaCat.trim();
-    if (!v || preciosCats.includes(v)) return;
-    const updated = [...preciosCats, v];
-    setPreciosCats(updated);
-    localStorage.setItem('balbi_cats', JSON.stringify(updated));
-    setNuevaCat('');
-  };
-
-  const eliminarCat = (cat) => {
-    const updated = preciosCats.filter(c => c !== cat);
-    setPreciosCats(updated);
-    localStorage.setItem('balbi_cats', JSON.stringify(updated));
-  };
+  // ── Categorías de precios (derivadas de productos en DB) ──
+  const [preciosCats, setPreciosCats] = React.useState([]);
+  React.useEffect(() => {
+    window.Auth.get('/productos').then(r => {
+      const list = Array.isArray(r) ? r : (r.data || []);
+      const cats = [...new Set(list.map(p => p.categoria).filter(Boolean))].sort();
+      setPreciosCats(cats);
+    }).catch(() => {});
+  }, []);
 
   const inpStyle = { height: 36, padding: '0 10px', border: '1px solid #E0DCE0', borderRadius: 8, fontSize: 13, fontFamily: 'inherit', outline: 'none', width: '100%', boxSizing: 'border-box' };
 
@@ -5506,26 +5546,15 @@ const ConfiguracionView = ({ currentUser }) => {
         <div style={{ marginTop: 36, marginBottom: 32 }}>
           <div style={{ marginBottom: 12 }}>
             <div style={{ fontSize: 16, fontWeight: 700 }}>Categorías de lista de precios</div>
-            <div style={{ fontSize: 13, color: '#888', marginTop: 3 }}>Las categorías aparecen en el módulo de Precios al agregar o filtrar productos.</div>
+            <div style={{ fontSize: 13, color: '#888', marginTop: 3 }}>Las categorías se generan automáticamente según los productos registrados. Para agregar una categoría, creá un producto con esa categoría desde el módulo de Precios.</div>
           </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             {preciosCats.map(cat => (
               <span key={cat} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 12px', background: '#FAF1F7', border: '1px solid #E5C5DC', borderRadius: 999, fontSize: 13, fontWeight: 600, color: '#A3007B' }}>
                 {cat}
-                <button onClick={() => eliminarCat(cat)} style={{ background: 'none', border: 'none', color: '#C2185B', cursor: 'pointer', padding: 0, fontSize: 12, display: 'flex', alignItems: 'center', lineHeight: 1 }}>✕</button>
               </span>
             ))}
-            {preciosCats.length === 0 && <span style={{ fontSize: 13, color: '#BBB' }}>Sin categorías aún</span>}
-          </div>
-          <div style={{ display: 'flex', gap: 8, maxWidth: 380 }}>
-            <input
-              style={{ ...inpStyle, flex: 1 }}
-              value={nuevaCat}
-              onChange={e => setNuevaCat(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && agregarCat()}
-              placeholder="Ej. Vacunas, Antiparasitarios…"
-            />
-            <button onClick={agregarCat} disabled={!nuevaCat.trim()} style={{ height: 36, padding: '0 18px', borderRadius: 8, background: '#A3007B', border: 'none', color: 'white', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', opacity: !nuevaCat.trim() ? 0.5 : 1, whiteSpace: 'nowrap' }}>+ Agregar</button>
+            {preciosCats.length === 0 && <span style={{ fontSize: 13, color: '#BBB' }}>Sin categorías aún — agregá productos desde el módulo de Precios</span>}
           </div>
         </div>
 

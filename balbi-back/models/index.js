@@ -17,6 +17,11 @@ const EventosAgenda = require('./EventosAgenda');
 const Vacunas = require('./Vacunas');
 const CustomFields = require('./CustomFields');
 const LibretaItem = require('./LibretaItem');
+const Guardias = require('./Guardias');
+const Internados = require('./Internados');
+const Productos = require('./Productos');
+const Alertas = require('./Alertas');
+const Cola = require('./Cola');
 
 // Definir relaciones
 
@@ -98,6 +103,13 @@ BloqueosAgenda.belongsTo(Profesionales, { foreignKey: 'profesionalID', as: 'prof
 Profesionales.hasMany(EventosAgenda, { foreignKey: 'profesionalID', as: 'eventosAgenda' });
 EventosAgenda.belongsTo(Profesionales, { foreignKey: 'profesionalID', as: 'profesional' });
 
+// Guardias - Profesionales (N:1)
+Guardias.belongsTo(Profesionales, { foreignKey: 'profesionalID', as: 'profesional' });
+
+// Internados - Mascotas y Profesionales (N:1)
+Internados.belongsTo(Mascotas, { foreignKey: 'mascotaID', as: 'mascota' });
+Internados.belongsTo(Profesionales, { foreignKey: 'profesionalID', as: 'profesional' });
+
 // Files - Pacientes (N:1) y Mascotas (N:1)
 Pacientes.hasMany(Files, { foreignKey: 'pacienteID', as: 'files' });
 Files.belongsTo(Pacientes, { foreignKey: 'pacienteID', as: 'paciente' });
@@ -124,5 +136,10 @@ module.exports = {
   EventosAgenda,
   Vacunas,
   CustomFields,
-  LibretaItem
+  LibretaItem,
+  Guardias,
+  Internados,
+  Productos,
+  Alertas,
+  Cola
 };

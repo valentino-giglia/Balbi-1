@@ -73,6 +73,11 @@ module.exports = async (app) => {
     const vacunasRoutes = require('./vacunas');
     const customFieldsRoutes = require('./custom-fields');
     const libretaRoutes = require('./libreta');
+    const guardiasRoutes = require('./guardias');
+    const internadosRoutes = require('./internados');
+    const productosRoutes = require('./productos');
+    const alertasRoutes = require('./alertas');
+    const colaRoutes = require('./cola');
 
     // Middleware para proteger endpoints salvo los públicos
     // Solo aplicar a rutas que empiecen con /api
@@ -143,6 +148,11 @@ module.exports = async (app) => {
     app.use('/api/vacunas', vacunasRoutes);
     app.use('/api/custom-fields', customFieldsRoutes);
     app.use('/api/libreta', libretaRoutes);
+    app.use('/api/guardias', guardiasRoutes);
+    app.use('/api/internados', internadosRoutes);
+    app.use('/api/productos', productosRoutes);
+    app.use('/api/alertas', alertasRoutes);
+    app.use('/api/cola', colaRoutes);
     app.use('/api/v1', apiV1Routes);
 
     console.log('✅ Todas las rutas registradas correctamente');
