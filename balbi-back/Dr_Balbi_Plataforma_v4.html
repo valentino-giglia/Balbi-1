@@ -1249,6 +1249,7 @@ const Dashboard = ({ goTo, openSearch }) => {
   const [internados, setInternados] = useStateD(() => _boxesToInternados());
 
   const [editGuardia, setEditGuardia] = useStateD(null);
+  const [editGuardias, setEditGuardias] = useStateD(false);
   const [editVets, setEditVets] = useStateD(false);
   const [editAlerta, setEditAlerta] = useStateD(null);
   const [editCola, setEditCola] = useStateD(null);
@@ -1345,6 +1346,7 @@ const Dashboard = ({ goTo, openSearch }) => {
         progreso={progreso}
         onEditGuardia={() => setEditGuardia(guardiaActiva || { id: Date.now(), vetId: vets[0]?.id || 1, tipo: 'Guardia 24hs', fecha: window.todayAR(), desde: '08:00', hasta: '20:00', activa: true })}
         onEditVets={() => setEditVets(true)}
+        onEditGuardias={() => setEditGuardias(true)}
       />
 
       {alertas.length > 0 && (
@@ -1385,6 +1387,7 @@ const Dashboard = ({ goTo, openSearch }) => {
       </div>
 
       {editGuardia && <GuardiaModal guardia={editGuardia} vets={vets} onClose={() => setEditGuardia(null)} onSave={(g) => { if (guardias.some(x => x.id === g.id)) { setGuardias(guardias.map(x => x.id === g.id ? g : x)); } else { setGuardias([...guardias, { ...g, activa: true }]); } setEditGuardia(null); }} />}
+      {editGuardias && <GuardiasListModal guardias={guardias} vets={vets} onClose={() => setEditGuardias(false)} onSave={(lista) => { setGuardias(lista); setEditGuardias(false); }} />}
       {editVets && <VetsModal vets={vets} onClose={() => setEditVets(false)} onSave={(vs) => { setVets(vs); setEditVets(false); }} />}
       {editAlerta && <AlertaModal alerta={editAlerta} onClose={() => setEditAlerta(null)} onSave={(a) => { if (a.id) setAlertas(alertas.map(x => x.id === a.id ? a : x)); else setAlertas([...alertas, { ...a, id: Math.max(0, ...alertas.map(x=>x.id))+1 }]); setEditAlerta(null); }} onDelete={(id) => { setAlertas(alertas.filter(x => x.id !== id)); setEditAlerta(null); }} />}
       {editCola && <ColaModal item={editCola} onClose={() => setEditCola(null)} onSave={(it) => { if (it.id) setCola(cola.map(x => x.id === it.id ? it : x)); else setCola([...cola, { ...it, id: Math.max(0, ...cola.map(x=>x.id))+1 }]); setEditCola(null); }} onDelete={(id) => { setCola(cola.filter(x => x.id !== id)); setEditCola(null); }} />}
@@ -1393,7 +1396,7 @@ const Dashboard = ({ goTo, openSearch }) => {
   );
 };
 
-const GuardiaHero = ({ guardia, vet, proxima, proxVet, restante, progreso, onEditGuardia, onEditVets }) => {
+const GuardiaHero = ({ guardia, vet, proxima, proxVet, restante, progreso, onEditGuardia, onEditVets, onEditGuardias }) => {
   const _isAdmin = window.Auth.getRole() === 'admin';
   const [_ghTick, _setGhTick] = useStateD(0);
   useEffectD(() => { const t = setInterval(() => _setGhTick(n => n + 1), 1000); return () => clearInterval(t); }, []);
@@ -1489,9 +1492,10 @@ const GuardiaHero = ({ guardia, vet, proxima, proxVet, restante, progreso, onEdi
             </React.Fragment>
           )}
           <div style={{ display: 'flex', gap: 6 }}>
-            {_isAdmin && <button onClick={onEditGuardia} title="Editar guardia" style={{ flex: '0 0 auto', height: 32, width: 32, borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.75)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><IconEdit size={14} /></button>}
-            {_isAdmin && <button onClick={onEditVets} style={{ flex: 1, height: 32, borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.85)', cursor: 'pointer', fontSize: 12, fontWeight: 600, fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}><IconUsers size={13} /> Equipo de guardia</button>}
+            {_isAdmin && <button onClick={onEditGuardia} title="Editar guardia activa" style={{ flex: '0 0 auto', height: 32, width: 32, borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.75)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><IconEdit size={14} /></button>}
+            {_isAdmin && <button onClick={onEditGuardias} style={{ flex: 1, height: 32, borderRadius: 8, background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.18)', color: 'white', cursor: 'pointer', fontSize: 12, fontWeight: 700, fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}><IconCalendar size={13} /> Programar guardias</button>}
           </div>
+          {_isAdmin && <button onClick={onEditVets} style={{ width: '100%', marginTop: 4, height: 28, borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.65)', cursor: 'pointer', fontSize: 11.5, fontWeight: 600, fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}><IconUsers size={12} /> Equipo de guardia</button>}
         </div>
       </div>
     </div>
@@ -1905,6 +1909,102 @@ const GuardiaModal = ({ guardia, vets, onClose, onSave }) => {
           <Field label="Desde"><Input type="time" value={d.desde} onChange={(e) => setD({ ...d, desde: e.target.value })} /></Field>
           <Field label="Hasta"><Input type="time" value={d.hasta} onChange={(e) => setD({ ...d, hasta: e.target.value })} /></Field>
         </div>
+      </div>
+    </Modal>
+  );
+};
+
+const GuardiasListModal = ({ guardias, vets, onClose, onSave }) => {
+  const hoy = window.todayAR ? window.todayAR() : new Date().toISOString().slice(0, 10);
+  const [lista, setLista] = useStateD(() => [...guardias].sort((a, b) => ((a.fecha||'')+(a.desde||'')).localeCompare((b.fecha||'')+(b.desde||''))));
+  const [nueva, setNueva] = useStateD({ vetId: vets[0]?.id || '', tipo: 'Guardia 24hs', fecha: hoy, desde: '08:00', hasta: '20:00' });
+  const [editIdx, setEditIdx] = useStateD(null);
+
+  const inpS = { height: 34, padding: '0 8px', border: '1px solid #E0DCE0', borderRadius: 7, fontSize: 12.5, fontFamily: 'inherit', outline: 'none', background: 'white' };
+  const selS = { ...inpS, cursor: 'pointer' };
+
+  const DIAS = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+  const fmtFecha = (f) => { if (!f) return '—'; const d = new Date(f+'T12:00:00Z'); return `${DIAS[d.getUTCDay()]} ${d.getUTCDate()}/${d.getUTCMonth()+1}/${d.getUTCFullYear().toString().slice(2)}`; };
+
+  const agregar = () => {
+    if (!nueva.vetId || !nueva.fecha) return;
+    const g = { ...nueva, id: Date.now(), vetId: parseInt(nueva.vetId), activa: false };
+    setLista(prev => [...prev, g].sort((a, b) => ((a.fecha||'')+(a.desde||'')).localeCompare((b.fecha||'')+(b.desde||''))));
+    setNueva(prev => ({ ...prev, fecha: nueva.fecha, desde: nueva.hasta, hasta: '20:00' }));
+  };
+
+  const eliminar = (id) => setLista(prev => prev.filter(g => g.id !== id));
+
+  const marcarActiva = (id) => setLista(prev => prev.map(g => ({ ...g, activa: g.id === id })));
+
+  return (
+    <Modal open={true} onClose={onClose} title="Programar guardias" width={660}
+      footer={<><Btn variant="ghost" onClick={onClose}>Cancelar</Btn><Btn variant="primary" icon={<IconCheck />} onClick={() => { onSave(lista); onClose(); }}>Guardar programación</Btn></>}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+        {/* Lista de guardias */}
+        <div style={{ border: '1px solid #EFEAEE', borderRadius: 10, overflow: 'hidden' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '90px 1fr 100px 90px 70px', padding: '8px 14px', background: '#FAFAF8', fontSize: 10.5, fontWeight: 700, color: '#888', letterSpacing: 0.4, textTransform: 'uppercase', borderBottom: '1px solid #EFEAEE' }}>
+            <div>Fecha</div><div>Veterinario</div><div>Tipo</div><div>Horario</div><div></div>
+          </div>
+          {lista.length === 0 && (
+            <div style={{ padding: '28px 0', textAlign: 'center', color: '#BBB', fontSize: 13 }}>Sin guardias programadas. Agregá la primera abajo.</div>
+          )}
+          {lista.map((g, i) => {
+            const vet = vets.find(v => v.id === g.vetId);
+            const isPast = g.fecha < hoy;
+            return (
+              <div key={g.id} style={{ display: 'grid', gridTemplateColumns: '90px 1fr 100px 90px 70px', padding: '10px 14px', borderBottom: i < lista.length-1 ? '1px solid #F4F0F2' : 'none', alignItems: 'center', background: g.activa ? '#FAF1F7' : isPast ? '#FAFAF8' : 'white' }}>
+                <div style={{ fontSize: 12.5, fontWeight: 600, color: isPast ? '#BBB' : '#1A1A1A' }}>{fmtFecha(g.fecha)}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                  {vet && <div style={{ width: 22, height: 22, borderRadius: '50%', background: vet.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 800, color: 'white', flexShrink: 0 }}>{vet.initials}</div>}
+                  <span style={{ fontSize: 12.5, color: isPast ? '#AAA' : '#333' }}>{vet?.name || '—'}</span>
+                  {g.activa && <span style={{ fontSize: 10, fontWeight: 700, background: '#A3007B', color: 'white', borderRadius: 5, padding: '2px 6px', letterSpacing: 0.3 }}>ACTIVA</span>}
+                </div>
+                <div style={{ fontSize: 11.5, color: '#777' }}>{g.tipo}</div>
+                <div style={{ fontSize: 11.5, fontFamily: 'ui-monospace, monospace', color: isPast ? '#AAA' : '#555' }}>{g.desde}–{g.hasta}</div>
+                <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
+                  {!g.activa && !isPast && <button title="Marcar como activa" onClick={() => marcarActiva(g.id)} style={{ height: 26, width: 26, borderRadius: 6, background: 'transparent', border: '1px solid #E0DCE0', color: '#1F8A5B', cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✓</button>}
+                  <button title="Eliminar" onClick={() => eliminar(g.id)} style={{ height: 26, width: 26, borderRadius: 6, background: 'transparent', border: '1px solid #EFEAEE', color: '#C2185B', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><IconTrash size={11} /></button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Formulario para agregar */}
+        <div style={{ background: '#FAF7FA', border: '1px solid #E5C5DC', borderRadius: 10, padding: 14 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#A3007B', marginBottom: 10 }}>+ Nueva guardia</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr 120px 80px 80px auto', gap: 8, alignItems: 'flex-end' }}>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: '#888', marginBottom: 4 }}>Fecha</div>
+              <input type="date" value={nueva.fecha} onChange={e => setNueva({...nueva, fecha: e.target.value})} style={{ ...inpS, width: '100%', boxSizing: 'border-box' }} />
+            </div>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: '#888', marginBottom: 4 }}>Veterinario</div>
+              <select value={nueva.vetId} onChange={e => setNueva({...nueva, vetId: e.target.value})} style={{ ...selS, width: '100%', boxSizing: 'border-box' }}>
+                <option value="">Seleccionar</option>
+                {vets.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: '#888', marginBottom: 4 }}>Tipo</div>
+              <select value={nueva.tipo} onChange={e => setNueva({...nueva, tipo: e.target.value})} style={{ ...selS, width: '100%', boxSizing: 'border-box' }}>
+                <option>Guardia matutina</option><option>Guardia tarde</option><option>Guardia nocturna</option><option>Guardia 24hs</option>
+              </select>
+            </div>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: '#888', marginBottom: 4 }}>Desde</div>
+              <input type="time" value={nueva.desde} onChange={e => setNueva({...nueva, desde: e.target.value})} style={{ ...inpS, width: '100%', boxSizing: 'border-box' }} />
+            </div>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: '#888', marginBottom: 4 }}>Hasta</div>
+              <input type="time" value={nueva.hasta} onChange={e => setNueva({...nueva, hasta: e.target.value})} style={{ ...inpS, width: '100%', boxSizing: 'border-box' }} />
+            </div>
+            <button onClick={agregar} disabled={!nueva.vetId || !nueva.fecha} style={{ height: 34, padding: '0 16px', borderRadius: 8, background: '#A3007B', border: 'none', color: 'white', fontWeight: 700, fontSize: 12.5, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap', opacity: (!nueva.vetId || !nueva.fecha) ? 0.5 : 1 }}>Agregar</button>
+          </div>
+        </div>
+
       </div>
     </Modal>
   );
