@@ -1241,7 +1241,12 @@ const Dashboard = ({ goTo, openSearch }) => {
   const [guardias, setGuardias] = useStateD(_savedGuardia.guardias || window.GUARDIAS_INIT);
   const [alertas, setAlertas] = useStateD(window.ALERTAS_INIT);
   const [cola, setCola] = useStateD(window.COLA_INIT);
-  const [internados, setInternados] = useStateD(window.INTERNADOS_LIVE);
+  const _boxesToInternados = () => (window._INTERN_BOXES || []).map(b => ({
+    petId: b.petId, box: b.id,
+    estado: b.estado === 'crítico' ? 'critico' : b.estado === 'observación' ? 'observacion' : 'estable',
+    motivo: b.motivo || '', vetId: null, proxMed: '—', proxMin: 999
+  }));
+  const [internados, setInternados] = useStateD(() => _boxesToInternados());
 
   const [editGuardia, setEditGuardia] = useStateD(null);
   const [editVets, setEditVets] = useStateD(false);
@@ -1252,7 +1257,9 @@ const Dashboard = ({ goTo, openSearch }) => {
   // Persistir vets y guardias en localStorage
   useEffectD(() => { localStorage.setItem('balbi_guardia', JSON.stringify({ vets, guardias })); }, [vets, guardias]);
   useEffectD(() => { window._goTo = goTo; }, [goTo]);
+  useEffectD(() => { const t = setInterval(() => setInternados(_boxesToInternados()), 2000); return () => clearInterval(t); }, []);
 
+  const [_colaTick, _setColaTick] = useStateD(0);
   useEffectD(() => {
     if (!window.Auth?.getToken()) return;
     const today = window.todayAR();
@@ -1272,7 +1279,8 @@ const Dashboard = ({ goTo, openSearch }) => {
         return [...manual, ...fromApi];
       });
     }).catch(() => {});
-  }, []);
+  }, [_colaTick]);
+  useEffectD(() => { const t = setInterval(() => _setColaTick(n => n + 1), 60000); return () => clearInterval(t); }, []);
 
   const guardiaActiva = guardias.find(g => g.activa) || guardias[0];
   const vetActivo = vets.find(v => v.id === guardiaActiva?.vetId);
@@ -4047,19 +4055,63 @@ const TODAY_IDX = _WEEK_DATES.findIndex(d => d === (window.todayAR ? window.toda
 const WEEK_TURNOS = [];
 
 const NuevoTurnoModal = ({ onClose, onSave }) => {
-  const [data, setData] = useState({ petId: PETS[0]?.id || 1, motivo: '', fecha: '2026-05-07', hora: '09:00', duracion: 30, vet: 'P. Balbi' });
+  const hoy = window.todayAR ? window.todayAR() : new Date().toISOString().slice(0, 10);
+  const [data, setData] = useState({ mascotaID: '', profesionalID: '', servicioID: '', fecha: hoy, hora: '09:00', duracion: 30, notas: '' });
+  const [profesionales, setProfesionales] = useState([]);
+  const [servicios, setServicios] = useState([]);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
   const selStyle = { height: 38, padding: '0 12px', borderRadius: 8, border: '1px solid #E0DCE0', fontSize: 14, fontFamily: 'inherit', outline: 'none', width: '100%', background: 'white' };
+
+  useEffect(() => {
+    window.Auth.get('/profesionales').then(r => setProfesionales(Array.isArray(r) ? r : (r.data || []))).catch(() => {});
+    window.Auth.get('/servicios').then(r => setServicios(Array.isArray(r) ? r : (r.data || []))).catch(() => {});
+  }, []);
+
+  const handleSave = async () => {
+    if (!data.profesionalID || !data.servicioID) { setError('Seleccioná profesional y servicio'); return; }
+    setSaving(true); setError('');
+    const horaInicio = `${data.fecha}T${data.hora}:00-03:00`;
+    const totalMin = parseInt(data.hora.split(':')[0]) * 60 + parseInt(data.hora.split(':')[1]) + parseInt(data.duracion);
+    const horaFin = `${data.fecha}T${String(Math.floor(totalMin/60)).padStart(2,'0')}:${String(totalMin%60).padStart(2,'0')}:00-03:00`;
+    try {
+      const res = await window.Auth.post('/turnos', {
+        profesionalID: parseInt(data.profesionalID),
+        servicioID: parseInt(data.servicioID),
+        mascotaID: data.mascotaID ? parseInt(data.mascotaID) : undefined,
+        horaInicio, horaFin, estado: 'RESERVADO',
+        notas: data.notas || undefined
+      });
+      onSave(res);
+      onClose();
+    } catch(e) {
+      setError('Error al crear turno. Verificá los datos.');
+      setSaving(false);
+    }
+  };
+
   return (
     <Modal open={true} onClose={onClose} title="Nuevo turno" width={500}
-      footer={<><Btn variant="ghost" onClick={onClose}>Cancelar</Btn><Btn variant="primary" icon={<IconCheck />} onClick={() => { onSave(data); onClose(); }} disabled={!data.motivo}>Agendar turno</Btn></>}>
+      footer={<><Btn variant="ghost" onClick={onClose}>Cancelar</Btn><Btn variant="primary" icon={<IconCheck />} onClick={handleSave} disabled={saving || !data.profesionalID || !data.servicioID}>{saving ? 'Guardando…' : 'Agendar turno'}</Btn></>}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <Field label="Paciente">
-          <select value={data.petId} onChange={(e) => setData({...data, petId: +e.target.value})} style={selStyle}>
-            {PETS.map(p => { const o = (window.CLIENTS||[]).find(c => c.id === p.ownerId); return <option key={p.id} value={p.id}>{p.name} — {o?.name}</option>; })}
+        {error && <div style={{ padding: '8px 12px', background: '#FEF2F4', borderRadius: 8, fontSize: 13, color: '#C2185B', fontWeight: 600 }}>{error}</div>}
+        <Field label="Mascota">
+          <select value={data.mascotaID} onChange={(e) => setData({...data, mascotaID: e.target.value})} style={selStyle}>
+            <option value="">Sin mascota asociada</option>
+            {(window.PETS||[]).map(p => { const o = (window.CLIENTS||[]).find(c => c.id === p.ownerId); return <option key={p.id} value={p.id}>{p.name} — {o?.name || ''}</option>; })}
           </select>
         </Field>
-        <Field label="Motivo">
-          <Input placeholder="Control anual, vacuna, cirugía…" value={data.motivo} onChange={(e) => setData({...data, motivo: e.target.value})} />
+        <Field label="Profesional *">
+          <select value={data.profesionalID} onChange={(e) => setData({...data, profesionalID: e.target.value})} style={selStyle}>
+            <option value="">Seleccionar profesional</option>
+            {profesionales.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
+          </select>
+        </Field>
+        <Field label="Servicio *">
+          <select value={data.servicioID} onChange={(e) => setData({...data, servicioID: e.target.value})} style={selStyle}>
+            <option value="">Seleccionar servicio</option>
+            {servicios.map(s => <option key={s.id} value={s.id}>{s.nombre}</option>)}
+          </select>
         </Field>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
           <Field label="Fecha"><Input type="date" value={data.fecha} onChange={(e) => setData({...data, fecha: e.target.value})} /></Field>
@@ -4070,11 +4122,8 @@ const NuevoTurnoModal = ({ onClose, onSave }) => {
             </select>
           </Field>
         </div>
-        <Field label="Profesional">
-          <select value={data.vet} onChange={(e) => setData({...data, vet: e.target.value})} style={selStyle}>
-            <option value="P. Balbi">Dr. Pablo Balbi</option>
-            <option value="C. Méndez">Dra. Carolina Méndez</option>
-          </select>
+        <Field label="Notas (opcional)">
+          <Input placeholder="Observaciones del turno…" value={data.notas} onChange={(e) => setData({...data, notas: e.target.value})} />
         </Field>
       </div>
     </Modal>
@@ -4127,18 +4176,27 @@ const AgendaView = () => {
     setDrag(null); setHover(null);
   };
 
-  const addTurno = async (data) => {
-    const [hStr, mStr] = data.hora.split(':');
-    const timeNum = +hStr + (+mStr) / 60;
-    const dayMap = { '2026-05-04': 0, '2026-05-05': 1, '2026-05-06': 2, '2026-05-07': 3, '2026-05-08': 4, '2026-05-09': 5, '2026-05-10': 6 };
-    const dayIdx = dayMap[data.fecha] ?? 2;
-    const vetColor = data.vet === 'P. Balbi' ? '#A3007B' : '#1F8A5B';
-    const newT = { id: Math.max(0, ...turnos.map(t => t.id)) + 1, day: dayIdx, time: timeNum, dur: data.duracion / 60, petId: data.petId, motivo: data.motivo, vet: data.vet, color: vetColor, fecha: data.fecha };
+  const addTurno = async (savedTurno) => {
+    const startDate = (savedTurno.horaInicio || '').slice(0, 10);
+    const dayIdx = _WEEK_DATES.indexOf(startDate);
+    if (dayIdx === -1) return;
+    const start = new Date(savedTurno.horaInicio);
+    const end   = new Date(savedTurno.horaFin);
+    const time  = start.getHours() + start.getMinutes() / 60;
+    const dur   = Math.max(0.25, (end - start) / 3600000);
+    const newT = {
+      id: savedTurno.id, day: dayIdx, time, dur,
+      petId: savedTurno.mascotaID,
+      motivo: savedTurno.servicio?.nombre || savedTurno.notas || 'Consulta',
+      vet: savedTurno.profesional?.nombre || 'Dr. Balbi',
+      color: savedTurno.profesional?.color || '#A3007B',
+      fecha: startDate,
+    };
     setTurnos(prev => [...prev, newT]);
     if (gcalToken) {
       try {
-        const pet = (window.PETS || []).find(p => p.id === data.petId);
-        const owner = (window.CLIENTS || []).find(c => c.id === pet?.ownerId);
+        const pet = (window.PETS || []).find(p => p.id === savedTurno.mascotaID);
+        const owner = pet ? (window.CLIENTS || []).find(c => c.id === pet.ownerId) : null;
         await window.createCalEvent(gcalToken, newT, pet, owner);
         setCalSyncMsg('Turno agregado a Google Calendar');
       } catch {
