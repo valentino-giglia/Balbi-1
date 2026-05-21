@@ -46,6 +46,27 @@ const resolverAlerta = async (req, res) => {
   }
 };
 
+const actualizarAlerta = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { tipo, petName, msg, detalle, minutos, severity } = req.body;
+
+    const [updated] = await Alertas.update(
+      { tipo, petName, msg, detalle, minutos, severity },
+      { where: { id } }
+    );
+
+    if (!updated) {
+      return res.status(404).json({ error: 'Alerta no encontrada' });
+    }
+
+    const alerta = await Alertas.findByPk(id);
+    res.json(alerta);
+  } catch (e) {
+    res.status(500).json({ error: 'Error al actualizar alerta' });
+  }
+};
+
 const eliminarAlerta = async (req, res) => {
   try {
     const { id } = req.params;
@@ -61,4 +82,4 @@ const eliminarAlerta = async (req, res) => {
   }
 };
 
-module.exports = { listarAlertas, crearAlerta, resolverAlerta, eliminarAlerta };
+module.exports = { listarAlertas, crearAlerta, resolverAlerta, actualizarAlerta, eliminarAlerta };

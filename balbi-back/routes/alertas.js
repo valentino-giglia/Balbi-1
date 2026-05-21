@@ -5,6 +5,7 @@ const c = require('../controllers/alertas.controller');
 router.get('/', c.listarAlertas);
 router.post('/', c.crearAlerta);
 router.put('/:id/resolver', c.resolverAlerta);
+router.put('/:id', c.actualizarAlerta);
 router.delete('/:id', c.eliminarAlerta);
 
 module.exports = router;

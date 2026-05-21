@@ -1252,7 +1252,7 @@ const Dashboard = ({ goTo, openSearch }) => {
   // Helpers de mapeo API → estado local
   const _mapVet = p => ({ id: p.id, name: p.nombre, role: p.codigo || '', color: p.color || '#A3007B', initials: p.nombre.split(' ').filter(Boolean).slice(0,2).map(s=>s[0]).join('').toUpperCase(), phone: p.telefono || '' });
   const _mapGuardia = g => ({ id: g.id, vetId: g.profesionalID, tipo: g.tipo, fecha: g.fecha, desde: g.desde, hasta: g.hasta, activa: g.activa });
-  const _mapInternado = b => ({ id: b.id, petId: b.mascotaID, box: b.id, estado: b.estado === 'crítico' ? 'critico' : b.estado === 'observación' ? 'observacion' : 'estable', motivo: b.motivo || '', vetId: b.profesionalID, proxMed: '—', proxMin: 999 });
+  const _mapInternado = b => ({ id: b.id, petId: b.mascotaID, box: b.id, estado: (b.estado === 'crítico' || b.estado === 'critico') ? 'critico' : (b.estado === 'observación' || b.estado === 'observacion') ? 'observacion' : 'estable', motivo: b.motivo || '', vetId: b.profesionalID, proxMed: '—', proxMin: 999 });
   const _mapCola = c => ({ id: c.id, fromApi: true, petName: c.petName || '', species: c.species || 'Canino', ownerName: c.ownerName || '', motivo: c.motivo || '', triage: c.triage || 'verde', espera: c.espera || 0, primera: c.primera || false, llegada: c.llegada || '' });
 
   const recargarVets = () => window.Auth.get('/profesionales?pageSize=100').then(r => { const l = Array.isArray(r)?r:(r.data||[]); setVets(l.map(_mapVet)); }).catch(()=>{});
@@ -1339,7 +1339,7 @@ const Dashboard = ({ goTo, openSearch }) => {
         <AlertasBand
           alertas={alertas}
           onEdit={(a) => setEditAlerta(a)}
-          onResolver={(id) => setAlertas(alertas.filter(a => a.id !== id))}
+          onResolver={async (id) => { try { await window.Auth.put(`/alertas/${id}/resolver`, {}); } catch {} setAlertas(alertas.filter(a => a.id !== id)); }}
           onAdd={() => setEditAlerta({ id: null, tipo: 'medicacion', petName: '', msg: '', detalle: '', minutos: 15, severity: 'critico' })}
         />
       )}
@@ -1391,7 +1391,15 @@ const Dashboard = ({ goTo, openSearch }) => {
         ].map(p => p.catch(() => {})));
         recargarGuardias(); setEditGuardias(false);
       }} />}
-      {editVets && <VetsModal vets={vets} onClose={() => setEditVets(false)} onSave={(vs) => { setVets(vs); setEditVets(false); }} />}
+      {editVets && <VetsModal vets={vets} onClose={() => setEditVets(false)} onSave={async (vs) => {
+        const removedIds = vets.filter(v => !vs.find(x => x.id === v.id)).map(v => v.id);
+        await Promise.all([
+          ...removedIds.map(id => window.Auth.del(`/profesionales/${id}`).catch(()=>{})),
+          ...vs.filter(v => v.id < 0).map(v => window.Auth.post('/profesionales', { nombre: v.name, codigo: v.role, color: v.color, telefono: v.phone }).catch(()=>{})),
+          ...vs.filter(v => v.id > 0).map(v => window.Auth.put(`/profesionales/${v.id}`, { nombre: v.name, codigo: v.role, color: v.color, telefono: v.phone }).catch(()=>{})),
+        ]);
+        recargarVets(); setEditVets(false);
+      }} />}
       {editAlerta && <AlertaModal alerta={editAlerta} onClose={() => setEditAlerta(null)} onSave={async (a) => {
         try {
           if (a.id) { await window.Auth.put(`/alertas/${a.id}`, a); } else { await window.Auth.post('/alertas', a); }
@@ -1405,7 +1413,7 @@ const Dashboard = ({ goTo, openSearch }) => {
         } catch {}
       }} onDelete={async (id) => { try { await window.Auth.del(`/cola/${id}`); recargarCola(); setEditCola(null); } catch {} }} />}
       {editInt && <InternadoModal item={editInt} vets={vets} onClose={() => setEditInt(null)} onSave={async (it) => {
-        try { await window.Auth.put(`/internados/${it.id}`, { estado: it.estado, motivo: it.motivo, vetId: it.vetId }); recargarInternados(); setEditInt(null); } catch {}
+        try { await window.Auth.put(`/internados/${it.id}`, { estado: it.estado, motivo: it.motivo, profesionalID: it.vetId }); recargarInternados(); setEditInt(null); } catch {}
       }} />}
     </div>
   );
@@ -1863,7 +1871,7 @@ const InternadosLive = ({ internados, vets, onEdit, goTo }) => {
           const vet = vets.find(v => v.id === it.vetId);
           const urgente = it.proxMin <= 20;
           return (
-            <div key={it.petId} style={{
+            <div key={it.id} style={{
               display: 'grid', gridTemplateColumns: '36px 1fr auto 28px', gap: 10, alignItems: 'center',
               padding: '11px 10px', borderTop: i ? '1px solid #F4F0F2' : 'none',
               background: it.estado === 'critico' ? '#FEF2F4' : 'transparent',
@@ -2029,7 +2037,7 @@ const VetsModal = ({ vets, onClose, onSave }) => {
   const [list, setList] = useStateD(vets);
   const update = (id, patch) => setList(list.map(v => v.id === id ? { ...v, ...patch } : v));
   const remove = (id) => setList(list.filter(v => v.id !== id));
-  const add = () => setList([...list, { id: Math.max(0, ...list.map(v => v.id))+1, name: 'Nuevo veterinario', role: '', color: '#A3007B', initials: 'NV', phone: '' }]);
+  const add = () => setList(prev => [...prev, { id: -Date.now(), name: 'Nuevo veterinario', role: '', color: '#A3007B', initials: 'NV', phone: '' }]);
   return (
     <Modal open={true} onClose={onClose} title="Veterinarios del equipo" width={640}
       footer={<><Btn variant="ghost" onClick={onClose}>Cancelar</Btn><Btn variant="primary" icon={<IconCheck />} onClick={() => onSave(list)}>Guardar cambios</Btn></>}>
@@ -2484,7 +2492,7 @@ const PacientesView = ({ loading, openPet, openNew }) => {
     const o = (window.CLIENTS || []).find(c => c.id === f.ownerId);
     return f.name.toLowerCase().includes(q.toLowerCase()) || (o?.name.toLowerCase().includes(q.toLowerCase()));
   });
-  const removeFall = (id) => { setFallecidos(fallecidos.filter(f => f.id !== id)); setConfirmDel(null); };
+  const removeFall = async (id) => { try { await window.Auth.del(`/mascotas/${id}`); } catch {} setFallecidos(fallecidos.filter(f => f.id !== id)); setConfirmDel(null); };
 
   return (
     <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16, overflow: 'auto', flex: 1 }}>
@@ -2599,7 +2607,7 @@ const PacientesView = ({ loading, openPet, openNew }) => {
 
       {editFall && (
         <Modal open={true} onClose={() => setEditFall(null)} title="Editar registro — fallecido" width={520}
-          footer={<><Btn variant="ghost" onClick={() => setEditFall(null)}>Cancelar</Btn><Btn variant="primary" icon={<IconCheck />} onClick={() => { setFallecidos(fallecidos.map(f => f.id === editFall.id ? editFall : f)); setEditFall(null); }}>Guardar cambios</Btn></>}>
+          footer={<><Btn variant="ghost" onClick={() => setEditFall(null)}>Cancelar</Btn><Btn variant="primary" icon={<IconCheck />} onClick={async () => { try { await window.Auth.put(`/mascotas/${editFall.id}`, { nombre: editFall.name, especie: editFall.species, raza: editFall.breed, fechaFallecimiento: editFall.deathDate, causaFallecimiento: editFall.cause }); } catch {} setFallecidos(fallecidos.map(f => f.id === editFall.id ? editFall : f)); setEditFall(null); }}>Guardar cambios</Btn></>}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: 10 }}>
               <Field label="Nombre"><Input value={editFall.name} onChange={(e) => setEditFall({...editFall, name: e.target.value})} /></Field>
@@ -2814,7 +2822,7 @@ const InternacionView = () => {
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14 }}>
         {boxes.map(b => {
-          const p = PETS.find(x => x.id === b.petId);
+          const p = PETS.find(x => x.id === b.mascotaID);
           const owner = p ? (window.CLIENTS||[]).find(c => c.id === p.ownerId) : null;
           const last = b.controles[b.controles.length - 1];
           return (
@@ -2825,13 +2833,13 @@ const InternacionView = () => {
                   <div style={{ fontSize: 16, fontWeight: 700 }}>{p?.name || 'Paciente'} <span style={{ color: '#888', fontWeight: 500, fontSize: 13 }}>· Box {b.id}</span></div>
                   <div style={{ fontSize: 12, color: '#888' }}>{p?.species} · {p?.breed} · {owner?.name}</div>
                 </div>
-                <Pill color={b.estado === 'estable' ? '#1F8A5B' : b.estado === 'crítico' ? '#C2185B' : '#D97706'}>{b.estado}</Pill>
+                <Pill color={b.estado === 'estable' ? '#1F8A5B' : (b.estado === 'critico' || b.estado === 'crítico') ? '#C2185B' : '#D97706'}>{b.estado}</Pill>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginTop: 14 }}>
                 <Vital label="T° últ." value={last ? `${last.t}°C` : '—'} icon={<IconActivity />} color={last && last.t > 39 ? '#C2185B' : '#1F8A5B'} />
                 <Vital label="FC" value={last ? last.fc : '—'} icon={<IconHeart />} />
                 <Vital label="FR" value={last ? last.fr : '—'} icon={<IconActivity />} />
-                <Vital label="Ingreso" value={b.ingreso.split(' ')[0].slice(5)} icon={<IconClock />} />
+                <Vital label="Ingreso" value={b.ingreso ? (b.ingreso.split('T')[0] || b.ingreso.split(' ')[0]).slice(5) : '—'} icon={<IconClock />} />
               </div>
               <div style={{ marginTop: 14, padding: 12, background: '#FAFAF8', borderRadius: 10, fontSize: 12, color: '#555', lineHeight: 1.5 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
@@ -3676,7 +3684,7 @@ window.PetSearchPicker = PetSearchPicker;
 
 // ConsultasView wrapper - pick patient first or open timeline
 const ConsultasView = () => {
-  const [petId, setPetId] = useState(null);
+  const [petId, setPetId] = useState(() => { const id = window._CONSULTAS_PET_ID || null; window._CONSULTAS_PET_ID = null; return id; });
   const [newConsulta, setNewConsulta] = useState(false);
   const [timelineRef, setTimelineRef] = useState(null);
   const pet = (window.PETS||[]).find(p => p.id === petId);
@@ -4201,7 +4209,7 @@ const DAY_NUMS = _WEEK_DATES.map(d => parseInt(d.slice(8)));
 const TODAY_IDX = _WEEK_DATES.findIndex(d => d === (window.todayAR ? window.todayAR() : new Date().toISOString().slice(0, 10)));
 const WEEK_TURNOS = [];
 
-const NuevoTurnoModal = ({ onClose, onSave }) => {
+const NuevoTurnoModal = ({ onClose, onSave, editId }) => {
   const hoy = window.todayAR ? window.todayAR() : new Date().toISOString().slice(0, 10);
   const [data, setData] = useState({ mascotaID: '', profesionalID: '', servicioID: '', fecha: hoy, hora: '09:00', duracion: 30, notas: '' });
   const [profesionales, setProfesionales] = useState([]);
@@ -4213,6 +4221,16 @@ const NuevoTurnoModal = ({ onClose, onSave }) => {
   useEffect(() => {
     window.Auth.get('/profesionales').then(r => setProfesionales(Array.isArray(r) ? r : (r.data || []))).catch(() => {});
     window.Auth.get('/servicios').then(r => setServicios(Array.isArray(r) ? r : (r.data || []))).catch(() => {});
+    if (editId) {
+      window.Auth.get('/turnos/' + editId).then(t => {
+        const start = new Date(t.horaInicio);
+        const end = new Date(t.horaFin);
+        const dur = Math.max(15, Math.round((end - start) / 60000));
+        const hora = `${String(start.getHours()).padStart(2,'0')}:${String(start.getMinutes()).padStart(2,'0')}`;
+        const fecha = (t.horaInicio || '').slice(0, 10);
+        setData({ mascotaID: t.mascotaID || '', profesionalID: t.profesionalID || '', servicioID: t.servicioID || '', fecha, hora, duracion: dur, notas: t.notas || '' });
+      }).catch(() => {});
+    }
   }, []);
 
   const handleSave = async () => {
@@ -4222,24 +4240,21 @@ const NuevoTurnoModal = ({ onClose, onSave }) => {
     const totalMin = parseInt(data.hora.split(':')[0]) * 60 + parseInt(data.hora.split(':')[1]) + parseInt(data.duracion);
     const horaFin = `${data.fecha}T${String(Math.floor(totalMin/60)).padStart(2,'0')}:${String(totalMin%60).padStart(2,'0')}:00-03:00`;
     try {
-      const res = await window.Auth.post('/turnos', {
-        profesionalID: parseInt(data.profesionalID),
-        servicioID: parseInt(data.servicioID),
-        mascotaID: data.mascotaID ? parseInt(data.mascotaID) : undefined,
-        horaInicio, horaFin, estado: 'RESERVADO',
-        notas: data.notas || undefined
-      });
+      const payload = { profesionalID: parseInt(data.profesionalID), servicioID: parseInt(data.servicioID), mascotaID: data.mascotaID ? parseInt(data.mascotaID) : null, horaInicio, horaFin, notas: data.notas || undefined };
+      const res = editId
+        ? await window.Auth.put('/turnos/' + editId, payload)
+        : await window.Auth.post('/turnos', { ...payload, estado: 'RESERVADO' });
       onSave(res);
       onClose();
     } catch(e) {
-      setError('Error al crear turno. Verificá los datos.');
+      setError(editId ? 'Error al actualizar turno.' : 'Error al crear turno. Verificá los datos.');
       setSaving(false);
     }
   };
 
   return (
-    <Modal open={true} onClose={onClose} title="Nuevo turno" width={500}
-      footer={<><Btn variant="ghost" onClick={onClose}>Cancelar</Btn><Btn variant="primary" icon={<IconCheck />} onClick={handleSave} disabled={saving || !data.profesionalID || !data.servicioID}>{saving ? 'Guardando…' : 'Agendar turno'}</Btn></>}>
+    <Modal open={true} onClose={onClose} title={editId ? 'Editar turno' : 'Nuevo turno'} width={500}
+      footer={<><Btn variant="ghost" onClick={onClose}>Cancelar</Btn><Btn variant="primary" icon={<IconCheck />} onClick={handleSave} disabled={saving || !data.profesionalID || !data.servicioID}>{saving ? 'Guardando…' : editId ? 'Guardar cambios' : 'Agendar turno'}</Btn></>}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         {error && <div style={{ padding: '8px 12px', background: '#FEF2F4', borderRadius: 8, fontSize: 13, color: '#C2185B', fontWeight: 600 }}>{error}</div>}
         <Field label="Mascota">
@@ -4284,6 +4299,7 @@ const AgendaView = () => {
   const [hover, setHover] = useState(null);
   const [selected, setSelected] = useState(null);
   const [nuevoTurno, setNuevoTurno] = useState(false);
+  const [editTurno, setEditTurno] = useState(null);
   const [gcalToken, setGcalToken] = useState(null);
   const [showGCalConfig, setShowGCalConfig] = useState(false);
   const [calSyncMsg, setCalSyncMsg] = useState('');
@@ -4321,6 +4337,16 @@ const AgendaView = () => {
     if (!drag) return;
     setTurnos(turnos.map(t => t.id === drag.id ? { ...t, day, time } : t));
     setDrag(null); setHover(null);
+    const fecha = _WEEK_DATES[day];
+    if (fecha && drag.id) {
+      const hH = String(Math.floor(time)).padStart(2, '0');
+      const hM = (time % 1) ? '30' : '00';
+      const horaInicio = `${fecha}T${hH}:${hM}:00-03:00`;
+      const durMin = Math.round((drag.dur || 0.5) * 60);
+      const totalMin = Math.floor(time) * 60 + (time % 1 ? 30 : 0) + durMin;
+      const horaFin = `${fecha}T${String(Math.floor(totalMin/60)).padStart(2,'0')}:${String(totalMin%60).padStart(2,'0')}:00-03:00`;
+      window.Auth.put('/turnos/' + drag.id, { horaInicio, horaFin }).catch(() => {});
+    }
   };
 
   const addTurno = async (savedTurno) => {
@@ -4564,8 +4590,8 @@ const AgendaView = () => {
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
-                  <Btn variant="secondary" size="sm" icon={<IconEdit />} style={{ flex: 1 }}>Editar</Btn>
-                  <Btn variant="primary" size="sm" icon={<IconStethoscope />} style={{ flex: 1 }}>Iniciar consulta</Btn>
+                  <Btn variant="secondary" size="sm" icon={<IconEdit />} style={{ flex: 1 }} onClick={() => { setEditTurno(selected); setSelected(null); }}>Editar</Btn>
+                  <Btn variant="primary" size="sm" icon={<IconStethoscope />} style={{ flex: 1 }} onClick={() => { window._CONSULTAS_PET_ID = selected.petId; setSelected(null); if (window._goTo) window._goTo('consultas'); }}>Iniciar consulta</Btn>
                 </div>
               </div>
             </div>
@@ -4575,6 +4601,19 @@ const AgendaView = () => {
 
       {showGCalConfig && <window.GoogleConfigModal mode="calendar" onClose={() => setShowGCalConfig(false)} onConnected={(tok) => { setGcalToken(tok); setCalSyncMsg('Conectado'); setTimeout(() => setCalSyncMsg(''), 2000); }} />}
       {nuevoTurno && <NuevoTurnoModal onClose={() => setNuevoTurno(false)} onSave={addTurno} />}
+      {editTurno && <NuevoTurnoModal editId={editTurno.id} onClose={() => setEditTurno(null)} onSave={(res) => {
+        setEditTurno(null);
+        window.Auth.get('/turnos').then(r => {
+          const raw = (r.data || r || []).map(t => {
+            const startDate = (t.horaInicio || '').slice(0, 10);
+            const dayIdx = _WEEK_DATES.indexOf(startDate);
+            if (dayIdx === -1) return null;
+            const start = new Date(t.horaInicio), end = new Date(t.horaFin);
+            return { id: t.id, day: dayIdx, time: start.getHours() + start.getMinutes()/60, dur: Math.max(0.25,(end-start)/3600000), petId: t.mascotaID, motivo: t.notas||t.servicio?.nombre||'Consulta', vet: t.profesional?.nombre||'Dr. Balbi', color: t.profesional?.color||'#A3007B', fecha: startDate };
+          }).filter(Boolean);
+          setTurnos(raw);
+        }).catch(() => {});
+      }} />}
     </div>
   );
 };
@@ -4666,7 +4705,8 @@ const Precios = () => {
     acc.ventaTotal += (p.venta || 0) * (p.stock || 0);
     return acc;
   }, { costoTotal: 0, ventaTotal: 0 });
-  const avgMargin = products.filter(p => p.costo > 0).reduce((s, p) => s + margin(p.costo, p.venta), 0) / products.filter(p => p.costo > 0).length;
+  const _prodConCosto = products.filter(p => p.costo > 0);
+  const avgMargin = _prodConCosto.length > 0 ? _prodConCosto.reduce((s, p) => s + margin(p.costo, p.venta), 0) / _prodConCosto.length : 0;
 
   const fmt = (n) => '$' + n.toLocaleString('es-AR', { maximumFractionDigits: 0 });
 
@@ -5742,8 +5782,10 @@ const App = () => {
 
         {/* Drawers + modals (overlay this column only) */}
         <ClientDrawer client={clientDrawer.client} open={clientDrawer.open} onClose={() => setClientDrawer({ ...clientDrawer, open: false })} goToPet={(p) => { setClientDrawer({ ...clientDrawer, open: false }); setPetDrawer({ open: true, pet: p }); }} goToMensajes={(c) => { setMensajeClientId(c.id); setActive('mensajes'); }} onSaved={() => setRefreshTick(t => t + 1)} />
-        <PetDrawer pet={petDrawer.pet} open={petDrawer.open} onClose={() => setPetDrawer({ ...petDrawer, open: false })} goToConsultas={() => setActive('consultas')} goToLibreta={(p) => { window._LIBRETA_PET_ID = p?.id; setActive('libreta'); }} />
-        <NewConsultaModal open={newConsulta} onClose={() => setNewConsulta(false)} />
+        <PetDrawer pet={petDrawer.pet} open={petDrawer.open} onClose={() => setPetDrawer({ ...petDrawer, open: false })} goToConsultas={(p) => { window._CONSULTAS_PET_ID = p?.id || null; setActive('consultas'); }} goToLibreta={(p) => { window._LIBRETA_PET_ID = p?.id; setActive('libreta'); }} />
+        <NewConsultaModal open={newConsulta} onClose={() => setNewConsulta(false)} onAdd={async (newC) => {
+          try { await window.Auth.post('/consultas', { mascotaID: newC.petId, motivoConsulta: newC.motivo, vet: newC.vet, pesoKg: newC.peso || null, extra: { temp: newC.temp, fc: newC.fc, estado: newC.estado } }); } catch {}
+        }} />
         <QuickSearchModal open={searchOpen} onClose={() => setSearchOpen(false)} openClient={(c) => { setSearchOpen(false); setClientDrawer({ open: true, client: c }); }} openPet={(p) => { setSearchOpen(false); setPetDrawer({ open: true, pet: p }); }} />
         {newClienteModal && <NuevoClienteModal onClose={() => setNewClienteModal(false)} onCreated={() => { setNewClienteModal(false); setRefreshTick(t => t + 1); }} />}
         {newPacienteModal && <NuevoPacienteModal onClose={() => setNewPacienteModal(false)} onCreated={() => setNewPacienteModal(false)} />}
