@@ -171,7 +171,7 @@ async function loadApiData() {
   try {
     const [pacRes, masRes, turRes, conRes] = await Promise.allSettled([
       Auth.get('/pacientes'),
-      Auth.get('/mascotas'),
+      Auth.get('/mascotas?estado=ACTIVO'),
       Auth.get('/turnos'),
       Auth.get('/consultas'),
     ]);
@@ -2458,12 +2458,12 @@ const PacientesView = ({ loading, openPet, openNew }) => {
 
   React.useEffect(() => {
     if (window.Auth?.getToken()) {
-      window.Auth.get('/mascotas').then(res => {
+      window.Auth.get('/mascotas?estado=ACTIVO').then(res => {
         const raw = res.data || res || [];
         const mapped = raw.map(m => ({
           id: m.id, name: m.nombre, species: m.especie || 'Canino', breed: m.raza || '—',
           sex: m.sexo || 'M', birth: m.fechaNacimiento || '', weight: m.peso || 0,
-          ownerId: m.pacienteID, status: m.estado === 'ACTIVO' ? 'activo' : 'activo',
+          ownerId: m.pacienteID, status: 'activo',
           color: m.color || '—', chip: m.chip || '—', alergias: m.alergias || 'Ninguna',
         }));
         window.PETS = mapped;
@@ -2485,6 +2485,15 @@ const PacientesView = ({ loading, openPet, openNew }) => {
         setFallecidos(mapped);
       }).catch(() => {});
     }
+  }, []);
+
+  React.useEffect(() => {
+    window._onMascotaFallecida = (fallData) => {
+      setPets(prev => prev.filter(p => p.id !== fallData.id));
+      setFallecidos(prev => [...prev, fallData]);
+      setTabPac('fallecidos');
+    };
+    return () => { window._onMascotaFallecida = null; };
   }, []);
 
   const filtered = pets.filter(p => (species === 'todos' || p.species === species) && p.name.toLowerCase().includes(q.toLowerCase()));
@@ -3168,12 +3177,20 @@ const PetDrawer = ({ pet, open, onClose, goToConsultas, goToLibreta }) => {
 
   const handleMarcarFallecido = async () => {
     try {
+      const deathDate = fallData.deathDate || new Date().toISOString().slice(0, 10);
       await window.Auth.put('/mascotas/' + pet.id, {
         estado: 'BAJA',
-        fechaFallecimiento: fallData.deathDate || new Date().toISOString().slice(0, 10),
+        fechaFallecimiento: deathDate,
         causaFallecimiento: fallData.cause
       });
       window.PETS = (window.PETS || []).filter(p => p.id !== pet.id);
+      if (typeof window._onMascotaFallecida === 'function') {
+        window._onMascotaFallecida({
+          id: pet.id, name: pet.name, species: pet.species, breed: pet.breed,
+          sex: pet.sex, birth: pet.birth, deathDate, cause: fallData.cause,
+          ownerId: pet.ownerId, lastVet: 'Dr. Balbi'
+        });
+      }
     } catch (e) {}
     setConfirmFall(false);
     onClose();
@@ -5662,6 +5679,48 @@ const LoginScreen = ({ onLogin }) => {
   );
 };
 
+// ── Banner de conexión ────────────────────────────────────────────────────────
+const OfflineBanner = () => {
+  const [status, setStatus] = useState(() => navigator.onLine ? 'online' : 'offline');
+
+  useEffect(() => {
+    let timer;
+    const goOffline = () => { clearTimeout(timer); setStatus('offline'); };
+    const goOnline  = () => {
+      setStatus('restored');
+      timer = setTimeout(() => setStatus('online'), 4000);
+    };
+    window.addEventListener('offline', goOffline);
+    window.addEventListener('online',  goOnline);
+    return () => {
+      window.removeEventListener('offline', goOffline);
+      window.removeEventListener('online',  goOnline);
+      clearTimeout(timer);
+    };
+  }, []);
+
+  if (status === 'online') return null;
+
+  const offline = status === 'offline';
+  return (
+    <div style={{
+      position: 'fixed', top: 0, left: 0, right: 0, zIndex: 99999,
+      background: offline ? '#DC2626' : '#16A34A',
+      color: '#fff', textAlign: 'center',
+      padding: '10px 16px', fontSize: 13, fontWeight: 600,
+      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+      boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
+      animation: 'slideDown 0.25s ease',
+    }}>
+      <style>{`@keyframes slideDown { from { transform: translateY(-100%); opacity:0; } to { transform: translateY(0); opacity:1; } }`}</style>
+      <span style={{ fontSize: 16 }}>{offline ? '⚠️' : '✅'}</span>
+      {offline
+        ? 'Sin conexión a internet — los cambios no se guardarán hasta recuperar la señal'
+        : 'Conexión restaurada'}
+    </div>
+  );
+};
+
 const App = () => {
   const [t, setTweak] = window.useTweaks(/*EDITMODE-BEGIN*/{
     "primary": "#A3007B",
@@ -5765,6 +5824,7 @@ const App = () => {
       fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif',
       position: 'relative',
     }}>
+      <OfflineBanner />
       <Sidebar active={active} setActive={(id) => { if (id === 'mensajes') setMsgBadge(0); safeSetActive(id); }} msgBadge={msgBadge} currentUser={currentUser} />
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
         <ActionBar title={cur.title} breadcrumb={cur.breadcrumb} onAction={onAction} />
