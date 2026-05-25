@@ -28,6 +28,10 @@ const initializeApp = async () => {
 
     app.use(express.static(__dirname));
 
+    app.get('/', (req, res) => {
+      res.sendFile(__dirname + '/Dr_Balbi_Plataforma_v4.html');
+    });
+
     app.use('*', (req, res) => {
       res.status(404).json({
         error: 'Ruta no encontrada'
