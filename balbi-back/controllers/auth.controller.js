@@ -86,8 +86,8 @@ const login = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error en login:', error);
-    res.status(500).json({ error: 'Error al iniciar sesión' });
+    console.error('Error en login:', error.message, error.stack);
+    res.status(500).json({ error: 'Error al iniciar sesión', detalle: error.message });
   }
 };
 
