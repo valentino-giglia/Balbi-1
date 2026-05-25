@@ -1,7 +1,6 @@
 [build]
-builder = "NIXPACKS"
-buildCommand = "cd balbi-back && npm install"
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
 
 [deploy]
-startCommand = "cd balbi-back && node server.js"
 healthcheckPath = "/health"
