@@ -1,0 +1,8 @@
+{
+  "name": "balbi",
+  "version": "1.0.0",
+  "scripts": {
+    "build": "cd balbi-back && npm install",
+    "start": "cd balbi-back && node server.js"
+  }
+}
