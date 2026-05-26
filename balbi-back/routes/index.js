@@ -8,7 +8,7 @@ require('../models');
 
 const AUTH_USER = process.env.AUTH_USER;
 const AUTH_PASSWORD = process.env.AUTH_PASSWORD;
-const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_SECRET = process.env.JWT_SECRET || '5a1fd1a6f0c94f0da3d6d6f0a615953d1d24a7d945f5b61d43b27554c8f9ed43';
 const JWT_EXPIRATION = process.env.JWT_EXPIRATION || '1h';
 const API_KEY = process.env.API_KEY;
 
