@@ -2920,7 +2920,15 @@ const iconBtn2 = { background: 'transparent', border: 'none', color: '#888', cur
 
 const ControlModal = ({ boxId, initial, idx, onClose, onSave }) => {
   const now = window.nowAR ? window.nowAR() : new Date();
-  const [c, setC] = useState(initial || { hora: now.toISOString().slice(11, 16), t: 38.5, fc: 90, fr: 22, obs: '', autor: 'Dr. Balbi' });
+  const [c, setC] = useState(initial || { hora: now.toISOString().slice(11, 16), t: 38.5, fc: 90, fr: 22, obs: '', autor: '' });
+  const [profs, setProfs] = useState([]);
+  React.useEffect(() => {
+    window.Auth?.get('/profesionales?pageSize=100').then(r => {
+      const list = Array.isArray(r) ? r : (r.data || []);
+      setProfs(list.filter(p => p.estado !== 'BAJA'));
+      if (!c.autor && list.length > 0) setC(prev => ({ ...prev, autor: list.find(p => p.estado !== 'BAJA')?.nombre || '' }));
+    }).catch(() => {});
+  }, []);
   return (
     <Modal open={true} onClose={onClose} title={idx != null ? 'Editar control' : 'Registrar control'}
       footer={<><Btn variant="ghost" onClick={onClose}>Cancelar</Btn><Btn variant="primary" icon={<IconCheck />} onClick={() => onSave(c)}>{idx != null ? 'Guardar cambios' : 'Registrar'}</Btn></>}>
@@ -2935,7 +2943,12 @@ const ControlModal = ({ boxId, initial, idx, onClose, onSave }) => {
           <textarea value={c.obs} onChange={(e) => setC({ ...c, obs: e.target.value })} rows={4} placeholder="Estado general, apetito, hidratación, evolución de la herida…"
             style={{ width: '100%', padding: 12, borderRadius: 8, border: '1px solid #E0DCE0', fontSize: 13.5, fontFamily: 'inherit', outline: 'none', resize: 'vertical', boxSizing: 'border-box' }} />
         </Field>
-        <Field label="Profesional"><Input value={c.autor} onChange={(e) => setC({ ...c, autor: e.target.value })} /></Field>
+        <Field label="Profesional">
+          <select value={c.autor} onChange={(e) => setC({ ...c, autor: e.target.value })} style={{ height: 38, padding: '0 12px', borderRadius: 8, border: '1px solid #E0DCE0', fontSize: 14, fontFamily: 'inherit', outline: 'none', width: '100%' }}>
+            {profs.length === 0 && <option value="">Cargando…</option>}
+            {profs.map(p => <option key={p.id} value={p.nombre}>{p.nombre}</option>)}
+          </select>
+        </Field>
       </div>
     </Modal>
   );
@@ -2968,7 +2981,7 @@ const PlanModal = ({ box, onClose, onSave }) => {
 const BoxModal = ({ box, onClose, onSave, onDelete, isNew }) => {
   const now = window.nowAR ? window.nowAR() : new Date();
   const activePets = (window.PETS || []).filter(p => p.status === 'activo');
-  const [data, setData] = useState(box || { petId: activePets[0]?.id || 1, ingreso: now.toISOString().slice(0,16).replace('T',' '), motivo: '', estado: 'estable', dieta: '', plan: '', ubicacion: 'Box 1' });
+  const [data, setData] = useState(box || { petId: activePets[0]?.id || 1, ingreso: now.toISOString().slice(0,16), motivo: '', estado: 'estable', dieta: '', plan: '', ubicacion: 'Box 1' });
   const [ubicacionCustom, setUbicacionCustom] = useState(false);
   const presets = ['Box 1','Box 2','Box 3','Box 4','Terapia intensiva','Aislamiento','Cirugía — recuperación'];
   return (
@@ -3005,7 +3018,7 @@ const BoxModal = ({ box, onClose, onSave, onDelete, isNew }) => {
               </div>
             )}
           </Field>
-          <Field label="Ingreso"><Input value={data.ingreso} onChange={(e) => setData({ ...data, ingreso: e.target.value })} placeholder="2026-05-09 14:00" /></Field>
+          <Field label="Ingreso"><Input type="datetime-local" value={data.ingreso} onChange={(e) => setData({ ...data, ingreso: e.target.value })} /></Field>
           <Field label="Estado">
             <select value={data.estado} onChange={(e) => setData({ ...data, estado: e.target.value })} style={{ height: 38, padding: '0 12px', borderRadius: 8, border: '1px solid #E0DCE0', fontSize: 14, fontFamily: 'inherit', outline: 'none' }}>
               <option value="estable">Estable</option><option value="observación">Observación</option><option value="crítico">Crítico</option>
@@ -3301,15 +3314,20 @@ const PetDrawer = ({ pet, open, onClose, goToConsultas, goToLibreta }) => {
   );
 };
 
-const NewConsultaModal = ({ open, onClose, onAdd }) => {
+const NewConsultaModal = ({ open, onClose, onAdd, initialPetId }) => {
   const pets = window.PETS || [];
-  const [petId, setPetId] = useState(pets[0]?.id || 1);
+  const [petId, setPetId] = useState(initialPetId || pets[0]?.id || 1);
   const [motivo, setMotivo] = useState('');
   const [fecha, setFecha] = useState(window.todayAR ? window.todayAR() : new Date().toISOString().slice(0,10));
-  const [hora, setHora] = useState('11:00');
+  const [hora, setHora] = useState(() => { const n = new Date(); return n.toTimeString().slice(0,5); });
   const [vet, setVet] = useState('Dr. Balbi');
+  const [fechaError, setFechaError] = useState('');
+  React.useEffect(() => { if (initialPetId) setPetId(initialPetId); }, [initialPetId]);
   const handleCreate = () => {
     if (!motivo.trim()) return;
+    const seleccionada = new Date(fecha + 'T' + hora);
+    if (seleccionada < new Date()) { setFechaError('La fecha y hora no puede ser anterior al momento actual.'); return; }
+    setFechaError('');
     const newC = { id: Date.now(), petId, date: fecha, time: hora, vet, motivo, anamnesis: '', diagnostico: '', tratamiento: '', peso: 0, temp: 38.5, fc: 88, estado: 'Estable' };
     if (onAdd) onAdd(newC);
     setMotivo('');
@@ -3335,9 +3353,10 @@ const NewConsultaModal = ({ open, onClose, onAdd }) => {
           <Input placeholder="Control anual, vacuna, otitis…" value={motivo} onChange={(e) => setMotivo(e.target.value)} />
         </Field>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-          <Field label="Fecha"><Input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} /></Field>
-          <Field label="Hora"><Input type="time" value={hora} onChange={(e) => setHora(e.target.value)} /></Field>
+          <Field label="Fecha"><Input type="date" value={fecha} onChange={(e) => { setFecha(e.target.value); setFechaError(''); }} /></Field>
+          <Field label="Hora"><Input type="time" value={hora} onChange={(e) => { setHora(e.target.value); setFechaError(''); }} /></Field>
         </div>
+        {fechaError && <div style={{ fontSize: 12, color: '#C2185B', background: '#FFF0F4', padding: '8px 12px', borderRadius: 8 }}>{fechaError}</div>}
         <Field label="Profesional">
           <select value={vet} onChange={(e) => setVet(e.target.value)} style={{ height: 38, padding: '0 12px', borderRadius: 8, border: '1px solid #E0DCE0', fontSize: 14, fontFamily: 'inherit', outline: 'none' }}>
             <option value="Dr. Balbi">Dr. Pablo Balbi</option>
@@ -3702,9 +3721,15 @@ window.PetSearchPicker = PetSearchPicker;
 // ConsultasView wrapper - pick patient first or open timeline
 const ConsultasView = () => {
   const [petId, setPetId] = useState(() => { const id = window._CONSULTAS_PET_ID || null; window._CONSULTAS_PET_ID = null; return id; });
-  const [newConsulta, setNewConsulta] = useState(false);
-  const [timelineRef, setTimelineRef] = useState(null);
+  const [newConsulta, setNewConsulta] = useState(() => { const v = window._CONSULTAS_OPEN_MODAL || false; window._CONSULTAS_OPEN_MODAL = false; return v; });
+  const [refreshKey, setRefreshKey] = useState(0);
   const pet = (window.PETS||[]).find(p => p.id === petId);
+  const handleAdd = async (newC) => {
+    try {
+      await window.Auth.post('/consultas', { mascotaID: newC.petId, motivoConsulta: newC.motivo, vet: newC.vet, pesoKg: newC.peso || null, extra: { temp: newC.temp, fc: newC.fc, estado: newC.estado } });
+      setRefreshKey(k => k + 1);
+    } catch {}
+  };
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <div style={{ padding: '14px 24px', borderBottom: '1px solid #EFEAEE', display: 'flex', gap: 12, alignItems: 'center', background: 'white' }}>
@@ -3718,7 +3743,7 @@ const ConsultasView = () => {
       </div>
       <div style={{ flex: 1, overflow: 'hidden' }}>
         {pet
-          ? <ConsultaTimeline key={petId} pet={pet} openNewConsulta={() => setNewConsulta(true)} />
+          ? <ConsultaTimeline key={`${petId}-${refreshKey}`} pet={pet} openNewConsulta={() => setNewConsulta(true)} />
           : <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 12, color: '#999' }}>
               <IconSearch size={40} color="#E0DCE0" />
               <div style={{ fontSize: 15, fontWeight: 600, color: '#BBB' }}>Buscá una mascota para ver su historia clínica</div>
@@ -3726,7 +3751,7 @@ const ConsultasView = () => {
             </div>
         }
       </div>
-      <NewConsultaModal open={newConsulta} onClose={() => setNewConsulta(false)} />
+      <NewConsultaModal open={newConsulta} onClose={() => setNewConsulta(false)} onAdd={handleAdd} initialPetId={petId} />
     </div>
   );
 };
@@ -5849,7 +5874,7 @@ const App = () => {
 
         {/* Drawers + modals (overlay this column only) */}
         <ClientDrawer client={clientDrawer.client} open={clientDrawer.open} onClose={() => setClientDrawer({ ...clientDrawer, open: false })} goToPet={(p) => { setClientDrawer({ ...clientDrawer, open: false }); setPetDrawer({ open: true, pet: p }); }} goToMensajes={(c) => { setMensajeClientId(c.id); setActive('mensajes'); }} onSaved={() => setRefreshTick(t => t + 1)} />
-        <PetDrawer pet={petDrawer.pet} open={petDrawer.open} onClose={() => setPetDrawer({ ...petDrawer, open: false })} goToConsultas={(p) => { window._CONSULTAS_PET_ID = p?.id || null; setActive('consultas'); }} goToLibreta={(p) => { window._LIBRETA_PET_ID = p?.id; setActive('libreta'); }} />
+        <PetDrawer pet={petDrawer.pet} open={petDrawer.open} onClose={() => setPetDrawer({ ...petDrawer, open: false })} goToConsultas={(p) => { window._CONSULTAS_PET_ID = p?.id || null; window._CONSULTAS_OPEN_MODAL = true; setActive('consultas'); }} goToLibreta={(p) => { window._LIBRETA_PET_ID = p?.id; setActive('libreta'); }} />
         <NewConsultaModal open={newConsulta} onClose={() => setNewConsulta(false)} onAdd={async (newC) => {
           try { await window.Auth.post('/consultas', { mascotaID: newC.petId, motivoConsulta: newC.motivo, vet: newC.vet, pesoKg: newC.peso || null, extra: { temp: newC.temp, fc: newC.fc, estado: newC.estado } }); } catch {}
         }} />
