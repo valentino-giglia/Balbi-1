@@ -81,12 +81,12 @@ const Auth = {
   },
   async post(path, body) {
     const r = await fetch(`${API_BASE}${path}`, { method: 'POST', headers: Auth.headers(), body: JSON.stringify(body) });
-    if (!r.ok) throw new Error(`Error ${r.status}`);
+    if (!r.ok) { const d = await r.json().catch(() => ({})); throw new Error(d.error || `Error ${r.status}`); }
     return r.json();
   },
   async put(path, body) {
     const r = await fetch(`${API_BASE}${path}`, { method: 'PUT', headers: Auth.headers(), body: JSON.stringify(body) });
-    if (!r.ok) throw new Error(`Error ${r.status}`);
+    if (!r.ok) { const d = await r.json().catch(() => ({})); throw new Error(d.error || `Error ${r.status}`); }
     return r.json();
   },
   async del(path) {
@@ -2670,7 +2670,7 @@ const NuevoClienteModal = ({ onClose, onCreated }) => {
       if (onCreated) onCreated(nuevo);
       onClose();
     } catch (e) {
-      setError('No se pudo guardar. Verificá la conexión.');
+      setError(e.message || 'No se pudo guardar. Verificá la conexión.');
     } finally {
       setSaving(false);
     }
@@ -3720,8 +3720,9 @@ window.PetSearchPicker = PetSearchPicker;
 
 // ConsultasView wrapper - pick patient first or open timeline
 const ConsultasView = () => {
-  const [petId, setPetId] = useState(() => { const id = window._CONSULTAS_PET_ID || null; window._CONSULTAS_PET_ID = null; return id; });
+  const [petId, setPetId] = useState(() => { const id = window._CONSULTAS_PET_ID || window._SELECTED_PET_ID || null; window._CONSULTAS_PET_ID = null; return id; });
   const [newConsulta, setNewConsulta] = useState(() => { const v = window._CONSULTAS_OPEN_MODAL || false; window._CONSULTAS_OPEN_MODAL = false; return v; });
+  React.useEffect(() => { if (petId) window._SELECTED_PET_ID = petId; }, [petId]);
   const [refreshKey, setRefreshKey] = useState(0);
   const pet = (window.PETS||[]).find(p => p.id === petId);
   const handleAdd = async (newC) => {
@@ -3774,7 +3775,8 @@ const LIBRETA_CATS_TEMPLATE = [
 ];
 
 const LibretaView = () => {
-  const [petId, setPetId] = useState(() => window._LIBRETA_PET_ID || (window.PETS?.[0]?.id) || null);
+  const [petId, setPetId] = useState(() => { const id = window._LIBRETA_PET_ID || window._SELECTED_PET_ID || null; window._LIBRETA_PET_ID = null; return id; });
+  React.useEffect(() => { if (petId) window._SELECTED_PET_ID = petId; }, [petId]);
   const pet = (window.PETS || []).find(p => p.id === petId);
   const owner = (window.CLIENTS || []).find(c => c.id === pet?.ownerId);
   const [open, setOpen] = useState('vacunas');

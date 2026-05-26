@@ -81,9 +81,15 @@ const crearPaciente = async (req, res) => {
 
     if (dniNorm) {
       const pacienteExistente = await Pacientes.findOne({ where: { dni: dniNorm } });
-      if (pacienteExistente) {
-        return res.status(400).json({ error: 'Ya existe un paciente con ese DNI' });
-      }
+      if (pacienteExistente) return res.status(400).json({ error: 'Ya existe un cliente con ese DNI' });
+    }
+    if (emailNorm) {
+      const pacienteExistente = await Pacientes.findOne({ where: { email: emailNorm } });
+      if (pacienteExistente) return res.status(400).json({ error: 'Ya existe un cliente con ese email' });
+    }
+    if (telefonoNorm) {
+      const pacienteExistente = await Pacientes.findOne({ where: { telefono: telefonoNorm } });
+      if (pacienteExistente) return res.status(400).json({ error: 'Ya existe un cliente con ese teléfono' });
     }
 
     const paciente = await Pacientes.create({
@@ -119,13 +125,19 @@ const actualizarPaciente = async (req, res) => {
     }
 
     const dniNorm = dni !== undefined ? normalizarStr(dni) : undefined;
-    if (dniNorm !== undefined) {
-      if (dniNorm && dniNorm !== paciente.dni) {
-        const pacienteExistente = await Pacientes.findOne({ where: { dni: dniNorm } });
-        if (pacienteExistente) {
-          return res.status(400).json({ error: 'Ya existe un paciente con ese DNI' });
-        }
-      }
+    if (dniNorm !== undefined && dniNorm && dniNorm !== paciente.dni) {
+      const pacienteExistente = await Pacientes.findOne({ where: { dni: dniNorm } });
+      if (pacienteExistente) return res.status(400).json({ error: 'Ya existe un cliente con ese DNI' });
+    }
+    const emailNormUpd = email !== undefined ? normalizarStr(email) : undefined;
+    if (emailNormUpd !== undefined && emailNormUpd && emailNormUpd !== paciente.email) {
+      const pacienteExistente = await Pacientes.findOne({ where: { email: emailNormUpd } });
+      if (pacienteExistente) return res.status(400).json({ error: 'Ya existe un cliente con ese email' });
+    }
+    const telefonoNormUpd = telefono !== undefined ? normalizarStr(telefono) : undefined;
+    if (telefonoNormUpd !== undefined && telefonoNormUpd && telefonoNormUpd !== paciente.telefono) {
+      const pacienteExistente = await Pacientes.findOne({ where: { telefono: telefonoNormUpd } });
+      if (pacienteExistente) return res.status(400).json({ error: 'Ya existe un cliente con ese teléfono' });
     }
 
     const updateData = {};
