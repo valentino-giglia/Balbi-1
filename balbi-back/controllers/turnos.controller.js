@@ -1,13 +1,66 @@
-const { 
-  Turnos, 
-  Pacientes, 
-  Profesionales, 
-  Servicios, 
+const {
+  Turnos,
+  Pacientes,
+  Profesionales,
+  Servicios,
   Consultas,
   Mascotas
 } = require('../models');
 const { Op } = require('sequelize');
 const { paginate } = require('../utils/pagination');
+const { getCalendar, CALENDAR_ID } = require('../config/google');
+
+// ── Google Calendar helpers ──────────────────────────────────────
+
+function buildCalendarEvent(turno, paciente, mascota, profesional, servicio) {
+  const nombreCliente = paciente ? paciente.nombre : 'Sin cliente';
+  const nombreMascota = mascota ? ` (${mascota.nombre})` : '';
+  const nombreServicio = servicio ? servicio.nombre : 'Turno';
+  const nombreProfesional = profesional ? profesional.nombre : '';
+
+  return {
+    summary: `${nombreServicio} — ${nombreCliente}${nombreMascota}`,
+    description: [
+      nombreProfesional ? `Profesional: ${nombreProfesional}` : '',
+      turno.notas ? `Notas: ${turno.notas}` : ''
+    ].filter(Boolean).join('\n'),
+    start: { dateTime: new Date(turno.horaInicio).toISOString() },
+    end: { dateTime: new Date(turno.horaFin).toISOString() }
+  };
+}
+
+async function crearEventoCalendar(turno, paciente, mascota, profesional, servicio) {
+  try {
+    const calendar = await getCalendar();
+    const event = buildCalendarEvent(turno, paciente, mascota, profesional, servicio);
+    const res = await calendar.events.insert({ calendarId: CALENDAR_ID, requestBody: event });
+    return res.data.id;
+  } catch (err) {
+    console.error('⚠️  Google Calendar — no se pudo crear evento:', err.message);
+    return null;
+  }
+}
+
+async function actualizarEventoCalendar(googleEventId, turno, paciente, mascota, profesional, servicio) {
+  if (!googleEventId) return;
+  try {
+    const calendar = await getCalendar();
+    const event = buildCalendarEvent(turno, paciente, mascota, profesional, servicio);
+    await calendar.events.update({ calendarId: CALENDAR_ID, eventId: googleEventId, requestBody: event });
+  } catch (err) {
+    console.error('⚠️  Google Calendar — no se pudo actualizar evento:', err.message);
+  }
+}
+
+async function eliminarEventoCalendar(googleEventId) {
+  if (!googleEventId) return;
+  try {
+    const calendar = await getCalendar();
+    await calendar.events.delete({ calendarId: CALENDAR_ID, eventId: googleEventId });
+  } catch (err) {
+    console.error('⚠️  Google Calendar — no se pudo eliminar evento:', err.message);
+  }
+}
 
 const listarTurnos = async (req, res) => {
   try {
@@ -333,6 +386,19 @@ const crearTurno = async (req, res) => {
     });
 
     res.status(201).json(turnoCompleto);
+
+    // Crear evento en Google Calendar (no bloquea la respuesta)
+    crearEventoCalendar(
+      turnoCompleto,
+      turnoCompleto.paciente,
+      turnoCompleto.mascota,
+      turnoCompleto.profesional,
+      turnoCompleto.servicio
+    ).then(async (googleEventId) => {
+      if (googleEventId) {
+        await Turnos.update({ googleEventId }, { where: { id: turnoCompleto.id } });
+      }
+    });
   } catch (error) {
     console.error('Error creando turno:', error);
     res.status(500).json({ error: 'Error al crear turno' });
@@ -455,6 +521,33 @@ const actualizarTurno = async (req, res) => {
     });
 
     res.json(turnoCompleto);
+
+    // Sincronizar con Google Calendar
+    const cancelado = turnoCompleto.estado === 'CANCELADO';
+    if (cancelado) {
+      eliminarEventoCalendar(turnoCompleto.googleEventId);
+    } else if (turnoCompleto.googleEventId) {
+      actualizarEventoCalendar(
+        turnoCompleto.googleEventId,
+        turnoCompleto,
+        turnoCompleto.paciente,
+        turnoCompleto.mascota,
+        turnoCompleto.profesional,
+        turnoCompleto.servicio
+      );
+    } else {
+      crearEventoCalendar(
+        turnoCompleto,
+        turnoCompleto.paciente,
+        turnoCompleto.mascota,
+        turnoCompleto.profesional,
+        turnoCompleto.servicio
+      ).then(async (googleEventId) => {
+        if (googleEventId) {
+          await Turnos.update({ googleEventId }, { where: { id: turnoCompleto.id } });
+        }
+      });
+    }
   } catch (error) {
     console.error('Error actualizando turno:', error);
     res.status(500).json({ error: 'Error al actualizar turno' });
@@ -528,6 +621,8 @@ const cancelarTurno = async (req, res) => {
     });
 
     res.json(turnoCompleto);
+
+    eliminarEventoCalendar(turnoCompleto.googleEventId);
   } catch (error) {
     console.error('Error cancelando turno:', error);
     res.status(500).json({ error: 'Error al cancelar turno' });

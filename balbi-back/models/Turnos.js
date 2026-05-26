@@ -75,6 +75,10 @@ const Turnos = sequelize.define('Turnos', {
       model: 'mascotas',
       key: 'id'
     }
+  },
+  googleEventId: {
+    type: DataTypes.STRING(255),
+    allowNull: true
   }
 }, {
   tableName: 'turnos',

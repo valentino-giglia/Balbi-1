@@ -1,6 +1,46 @@
 const { Servicios } = require('../models');
 const { Op } = require('sequelize');
 const { paginate } = require('../utils/pagination');
+const { getSheets, SHEET_ID } = require('../config/google');
+
+// ── Google Sheets sync ───────────────────────────────────────────
+
+const SHEET_NAME = 'Precios';
+
+async function sincronizarTodosLosServicios() {
+  try {
+    const servicios = await Servicios.findAll({ order: [['id', 'ASC']] });
+    const sheets = await getSheets();
+
+    const header = [['ID', 'Nombre', 'Código', 'Precio', 'Estado']];
+    const rows = servicios.map(s => [
+      s.id,
+      s.nombre,
+      s.codigo,
+      s.precio != null ? parseFloat(s.precio) : 0,
+      s.estado
+    ]);
+
+    // Limpiar hoja y escribir desde A1
+    await sheets.spreadsheets.values.clear({
+      spreadsheetId: SHEET_ID,
+      range: `${SHEET_NAME}!A:E`
+    });
+
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: SHEET_ID,
+      range: `${SHEET_NAME}!A1`,
+      valueInputOption: 'RAW',
+      requestBody: { values: [...header, ...rows] }
+    });
+
+    console.log(`✅ Google Sheets — ${servicios.length} servicios sincronizados`);
+  } catch (err) {
+    console.error('⚠️  Google Sheets — no se pudo sincronizar servicios:', err.message);
+  }
+}
+
+// ── Handlers ────────────────────────────────────────────────────
 
 const listarServicios = async (req, res) => {
   try {
@@ -55,11 +95,7 @@ const crearServicio = async (req, res) => {
       return res.status(400).json({ error: 'Nombre y código son requeridos' });
     }
 
-    // Verificar que el código no exista
-    const servicioExistente = await Servicios.findOne({
-      where: { codigo }
-    });
-
+    const servicioExistente = await Servicios.findOne({ where: { codigo } });
     if (servicioExistente) {
       return res.status(400).json({ error: 'El código del servicio ya existe' });
     }
@@ -74,6 +110,7 @@ const crearServicio = async (req, res) => {
     });
 
     res.status(201).json(servicio);
+    sincronizarTodosLosServicios();
   } catch (error) {
     console.error('Error creando servicio:', error);
     if (error.name === 'SequelizeUniqueConstraintError') {
@@ -93,12 +130,8 @@ const actualizarServicio = async (req, res) => {
       return res.status(404).json({ error: 'Servicio no encontrado' });
     }
 
-    // Si se actualiza el código, verificar que no exista
     if (codigo && codigo !== servicio.codigo) {
-      const servicioExistente = await Servicios.findOne({
-        where: { codigo }
-      });
-
+      const servicioExistente = await Servicios.findOne({ where: { codigo } });
       if (servicioExistente) {
         return res.status(400).json({ error: 'El código del servicio ya existe' });
       }
@@ -115,6 +148,7 @@ const actualizarServicio = async (req, res) => {
     await servicio.update(updateData);
 
     res.json(servicio);
+    sincronizarTodosLosServicios();
   } catch (error) {
     console.error('Error actualizando servicio:', error);
     if (error.name === 'SequelizeUniqueConstraintError') {
@@ -135,6 +169,7 @@ const eliminarServicio = async (req, res) => {
 
     await servicio.update({ estado: 'BAJA' });
     res.json({ message: 'Servicio eliminado correctamente' });
+    sincronizarTodosLosServicios();
   } catch (error) {
     console.error('Error eliminando servicio:', error);
     res.status(500).json({ error: 'Error al eliminar servicio' });
@@ -146,5 +181,6 @@ module.exports = {
   obtenerServicio,
   crearServicio,
   actualizarServicio,
-  eliminarServicio
+  eliminarServicio,
+  sincronizarTodosLosServicios
 };

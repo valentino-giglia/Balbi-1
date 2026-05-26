@@ -17,6 +17,10 @@ const initializeApp = async () => {
   try {
     await require('./routes/index')(app);
 
+    // Sincronizar servicios con Google Sheets al arrancar
+    const { sincronizarTodosLosServicios } = require('./controllers/servicios.controller');
+    sincronizarTodosLosServicios();
+
     app.get('/health', (req, res) => {
       res.json({
         status: 'OK',
