@@ -17,9 +17,11 @@ const initializeApp = async () => {
   try {
     await require('./routes/index')(app);
 
-    // Sincronizar servicios con Google Sheets al arrancar
+    // Sincronizar precios con Google Sheets al arrancar
     const { sincronizarTodosLosServicios } = require('./controllers/servicios.controller');
+    const { sincronizarTodosLosProductos } = require('./controllers/productos.controller');
     sincronizarTodosLosServicios();
+    sincronizarTodosLosProductos();
 
     app.get('/health', (req, res) => {
       res.json({

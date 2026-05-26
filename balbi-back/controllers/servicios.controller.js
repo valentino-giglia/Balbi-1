@@ -5,7 +5,7 @@ const { getSheets, SHEET_ID } = require('../config/google');
 
 // ── Google Sheets sync ───────────────────────────────────────────
 
-const SHEET_NAME = 'Precios';
+const SHEET_NAME = 'Servicios';
 
 async function sincronizarTodosLosServicios() {
   try {

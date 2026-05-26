@@ -4670,8 +4670,9 @@ window.AgendaView = AgendaView;
 <script type="text/babel">
 
 // precios.jsx
-// Precios — productos editables con cálculo de margen + sync Sheets
+// Precios — productos + servicios con sub-pestañas y sync Sheets
 const Precios = () => {
+  const [subTab, setSubTab] = useState('lista');
   const [products, setProducts] = useState([]);
   const [q, setQ] = useState('');
   const [cat, setCat] = useState('todos');
@@ -4680,6 +4681,13 @@ const Precios = () => {
   const [showNew, setShowNew] = useState(false);
   const [gsheetsToken, setGsheetsToken] = useState(null);
   const [showSheetsConfig, setShowSheetsConfig] = useState(false);
+  // servicios
+  const [servicios, setServicios] = useState([]);
+  const [editSrv, setEditSrv] = useState(null);
+  const [savingSrv, setSavingSrv] = useState(false);
+  const [srvMsg, setSrvMsg] = useState('');
+  const [showNuevoSrv, setShowNuevoSrv] = useState(false);
+  const [nuevoSrv, setNuevoSrv] = useState({ nombre: '', codigo: '', duracionMinutos: 30, precio: 0, color: '#1976d2' });
   const [syncing, setSyncing] = useState(false);
   const [syncMsg, setSyncMsg] = useState('');
 
@@ -4689,7 +4697,38 @@ const Precios = () => {
       const list = Array.isArray(r) ? r : (r.data || []);
       setProducts(list);
     }).catch(() => {});
+    window.Auth.get('/servicios?pageSize=100').then(r => {
+      setServicios(Array.isArray(r) ? r : (r.data || []));
+    }).catch(() => {});
   }, []);
+
+  const recargarSrv = () => window.Auth.get('/servicios?pageSize=100').then(r => setServicios(Array.isArray(r) ? r : (r.data || []))).catch(() => {});
+
+  const crearSrv = async () => {
+    if (!nuevoSrv.nombre || !nuevoSrv.codigo) { setSrvMsg('Nombre y código requeridos'); return; }
+    setSavingSrv(true);
+    try {
+      await window.Auth.post('/servicios', { nombre: nuevoSrv.nombre, codigo: nuevoSrv.codigo, duracionMinutos: parseInt(nuevoSrv.duracionMinutos)||30, precio: parseFloat(nuevoSrv.precio)||0, color: nuevoSrv.color });
+      setShowNuevoSrv(false); setNuevoSrv({ nombre:'', codigo:'', duracionMinutos:30, precio:0, color:'#1976d2' });
+      setSrvMsg('Servicio creado'); setTimeout(()=>setSrvMsg(''),2500); recargarSrv();
+    } catch { setSrvMsg('Error al crear'); }
+    setSavingSrv(false);
+  };
+
+  const guardarSrv = async () => {
+    if (!editSrv) return;
+    setSavingSrv(true);
+    try {
+      await window.Auth.put(`/servicios/${editSrv.id}`, { nombre: editSrv.nombre, codigo: editSrv.codigo, duracionMinutos: parseInt(editSrv.duracionMinutos)||30, precio: parseFloat(editSrv.precio)||0, color: editSrv.color });
+      setSrvMsg('Guardado'); setTimeout(()=>setSrvMsg(''),2500); setEditSrv(null); recargarSrv();
+    } catch { setSrvMsg('Error al guardar'); }
+    setSavingSrv(false);
+  };
+
+  const eliminarSrv = async (id) => {
+    if (!window.confirm('¿Eliminar este servicio?')) return;
+    try { await window.Auth.del(`/servicios/${id}`); recargarSrv(); } catch { setSrvMsg('Error al eliminar'); }
+  };
 
   React.useEffect(() => {
     if (!gsheetsToken) return;
@@ -4754,8 +4793,25 @@ const Precios = () => {
 
   const fmt = (n) => '$' + n.toLocaleString('es-AR', { maximumFractionDigits: 0 });
 
+  const inpSrv = { height: 36, padding: '0 10px', border: '1px solid #E0DCE0', borderRadius: 8, fontSize: 13, fontFamily: 'inherit', outline: 'none', width: '100%', boxSizing: 'border-box' };
+
   return (
     <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16, overflow: 'auto', flex: 1 }}>
+
+      {/* Sub-pestañas */}
+      <div style={{ display: 'flex', gap: 4, background: '#F4F0F2', padding: 4, borderRadius: 10, alignSelf: 'flex-start' }}>
+        {[['lista','Lista de precios'],['servicios','Servicios']].map(([id, label]) => (
+          <button key={id} onClick={() => setSubTab(id)} style={{
+            padding: '8px 20px', border: 'none', borderRadius: 7, fontSize: 13, fontWeight: 700,
+            background: subTab === id ? 'white' : 'transparent',
+            color: subTab === id ? '#A3007B' : '#666',
+            cursor: 'pointer', boxShadow: subTab === id ? '0 1px 3px rgba(0,0,0,0.08)' : 'none', fontFamily: 'inherit'
+          }}>{label}</button>
+        ))}
+      </div>
+
+      {/* ── LISTA DE PRECIOS (productos) ── */}
+      {subTab === 'lista' && <>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', background: 'white', border: '1px solid #EFEAEE', borderRadius: 12 }}>
         <div style={{ width: 36, height: 36, borderRadius: 8, background: '#E8F5EE', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <svg width="20" height="20" viewBox="0 0 48 48"><path fill="#0F9D58" d="M37 4H11a3 3 0 00-3 3v34a3 3 0 003 3h26a3 3 0 003-3V7a3 3 0 00-3-3z"/><path fill="white" d="M14 14h20v3H14zM14 19h20v3H14zM14 24h20v3H14zM14 29h20v3H14zM14 34h20v3H14zM21 14h2v23h-2zM27 14h2v23h-2z"/></svg>
@@ -4846,6 +4902,78 @@ const Precios = () => {
 
       {showSheetsConfig && <window.GoogleConfigModal mode="sheets" onClose={() => setShowSheetsConfig(false)} onConnected={(tok) => { setGsheetsToken(tok); setSyncMsg('Conectado — sincronizando…'); }} />}
       {showNew && <NewProductModal onClose={() => setShowNew(false)} onSave={addNew} cats={cats.filter(c => c !== 'todos')} />}
+      </>}
+
+      {/* ── SERVICIOS ── */}
+      {subTab === 'servicios' && <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <div style={{ fontSize: 15, fontWeight: 700 }}>Servicios</div>
+            <div style={{ fontSize: 12, color: '#888', marginTop: 2 }}>Tipos de consultas y su precio. Se sincronizan automáticamente con Google Sheets.</div>
+          </div>
+          <button onClick={() => setShowNuevoSrv(true)} style={{ height: 38, padding: '0 18px', borderRadius: 10, background: '#A3007B', border: 'none', color: 'white', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 6 }}>+ Nuevo servicio</button>
+        </div>
+
+        {srvMsg && <div style={{ padding: '10px 14px', background: srvMsg.includes('Error') ? '#FEF2F4' : '#E8F5EE', borderRadius: 8, fontSize: 13, color: srvMsg.includes('Error') ? '#C2185B' : '#1F8A5B', fontWeight: 600 }}>{srvMsg}</div>}
+
+        {showNuevoSrv && (
+          <div style={{ background: '#FAF7FA', border: '1px solid #E5C5DC', borderRadius: 12, padding: 18 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12, color: '#A3007B' }}>Nuevo servicio</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 10, marginBottom: 12 }}>
+              <div><div style={{ fontSize: 11.5, fontWeight: 600, color: '#666', marginBottom: 4 }}>Nombre</div><input style={inpSrv} value={nuevoSrv.nombre} onChange={e => setNuevoSrv({...nuevoSrv, nombre: e.target.value})} placeholder="Ej. Consulta general" /></div>
+              <div><div style={{ fontSize: 11.5, fontWeight: 600, color: '#666', marginBottom: 4 }}>Código</div><input style={inpSrv} value={nuevoSrv.codigo} onChange={e => setNuevoSrv({...nuevoSrv, codigo: e.target.value})} placeholder="Ej. CONS" /></div>
+              <div><div style={{ fontSize: 11.5, fontWeight: 600, color: '#666', marginBottom: 4 }}>Duración (min)</div><input style={inpSrv} type="number" value={nuevoSrv.duracionMinutos} onChange={e => setNuevoSrv({...nuevoSrv, duracionMinutos: e.target.value})} /></div>
+              <div><div style={{ fontSize: 11.5, fontWeight: 600, color: '#666', marginBottom: 4 }}>Precio ($)</div><input style={inpSrv} type="number" value={nuevoSrv.precio} onChange={e => setNuevoSrv({...nuevoSrv, precio: e.target.value})} /></div>
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={crearSrv} disabled={savingSrv} style={{ height: 36, padding: '0 20px', borderRadius: 8, background: '#A3007B', border: 'none', color: 'white', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>{savingSrv ? 'Guardando…' : 'Crear'}</button>
+              <button onClick={() => setShowNuevoSrv(false)} style={{ height: 36, padding: '0 16px', borderRadius: 8, background: 'transparent', border: '1px solid #E0DCE0', color: '#666', fontWeight: 600, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>Cancelar</button>
+            </div>
+          </div>
+        )}
+
+        <div style={{ background: 'white', border: '1px solid #EFEAEE', borderRadius: 12, overflow: 'hidden' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1.8fr 100px 110px 120px 100px 60px', padding: '10px 16px', background: '#FAFAF8', fontSize: 11, fontWeight: 700, color: '#666', letterSpacing: 0.4, textTransform: 'uppercase', borderBottom: '1px solid #EFEAEE' }}>
+            <div>Nombre</div><div>Código</div><div style={{textAlign:'center'}}>Duración</div><div style={{textAlign:'center'}}>Precio</div><div>Estado</div><div></div>
+          </div>
+          {servicios.filter(s => s.estado !== 'BAJA').map(s => {
+            const isEdit = editSrv?.id === s.id;
+            return (
+              <div key={s.id} style={{ display: 'grid', gridTemplateColumns: '1.8fr 100px 110px 120px 100px 60px', padding: '10px 16px', borderBottom: '1px solid #F4F0F2', alignItems: 'center', fontSize: 13, background: isEdit ? '#FAF1F7' : 'white' }}>
+                {isEdit ? <>
+                  <input style={{...inpSrv, height:30}} value={editSrv.nombre} onChange={e=>setEditSrv({...editSrv,nombre:e.target.value})} />
+                  <input style={{...inpSrv, height:30}} value={editSrv.codigo} onChange={e=>setEditSrv({...editSrv,codigo:e.target.value})} />
+                  <input style={{...inpSrv, height:30, textAlign:'center'}} type="number" value={editSrv.duracionMinutos} onChange={e=>setEditSrv({...editSrv,duracionMinutos:e.target.value})} />
+                  <input style={{...inpSrv, height:30, textAlign:'center'}} type="number" value={editSrv.precio} onChange={e=>setEditSrv({...editSrv,precio:e.target.value})} />
+                  <div />
+                  <div style={{display:'flex',gap:4}}>
+                    <button onClick={guardarSrv} disabled={savingSrv} style={{height:28,padding:'0 10px',borderRadius:6,background:'#A3007B',border:'none',color:'white',fontWeight:700,fontSize:11,cursor:'pointer',fontFamily:'inherit'}}>OK</button>
+                    <button onClick={()=>setEditSrv(null)} style={{height:28,padding:'0 8px',borderRadius:6,background:'transparent',border:'1px solid #E0DCE0',color:'#666',fontSize:11,cursor:'pointer',fontFamily:'inherit'}}>✕</button>
+                  </div>
+                </> : <>
+                  <div style={{fontWeight:600,display:'flex',alignItems:'center',gap:8}}><span style={{width:10,height:10,borderRadius:'50%',background:s.color||'#888',display:'inline-block',flexShrink:0}}></span>{s.nombre}</div>
+                  <div style={{color:'#888',fontSize:12}}>{s.codigo}</div>
+                  <div style={{textAlign:'center',color:'#666'}}>{s.duracionMinutos} min</div>
+                  <div style={{textAlign:'center',fontWeight:700,color:'#A3007B'}}>${(s.precio||0).toLocaleString('es-AR')}</div>
+                  <div><span style={{fontSize:11,fontWeight:700,color:s.estado==='ACTIVO'?'#1F8A5B':'#888',background:s.estado==='ACTIVO'?'#E8F5EE':'#F4F0F2',borderRadius:6,padding:'3px 9px'}}>{s.estado}</span></div>
+                  <div style={{display:'flex',gap:4,justifyContent:'flex-end'}}>
+                    <button onClick={()=>setEditSrv({...s})} title="Editar" style={{height:28,width:28,borderRadius:6,background:'transparent',border:'1px solid #E0DCE0',color:'#888',cursor:'pointer',fontSize:13,display:'flex',alignItems:'center',justifyContent:'center'}}
+                      onMouseEnter={e=>{e.currentTarget.style.borderColor='#A3007B';e.currentTarget.style.color='#A3007B';}}
+                      onMouseLeave={e=>{e.currentTarget.style.borderColor='#E0DCE0';e.currentTarget.style.color='#888';}}>✏️</button>
+                    <button onClick={()=>eliminarSrv(s.id)} title="Eliminar" style={{height:28,width:28,borderRadius:6,background:'transparent',border:'1px solid #E0DCE0',color:'#888',cursor:'pointer',fontSize:13,display:'flex',alignItems:'center',justifyContent:'center'}}
+                      onMouseEnter={e=>{e.currentTarget.style.borderColor='#C2185B';e.currentTarget.style.color='#C2185B';e.currentTarget.style.background='#FEF2F4';}}
+                      onMouseLeave={e=>{e.currentTarget.style.borderColor='#E0DCE0';e.currentTarget.style.color='#888';e.currentTarget.style.background='transparent';}}>🗑</button>
+                  </div>
+                </>}
+              </div>
+            );
+          })}
+          {servicios.filter(s => s.estado !== 'BAJA').length === 0 && (
+            <div style={{ padding: '24px 16px', textAlign: 'center', color: '#BBB', fontSize: 13 }}>Sin servicios — agregá uno con el botón de arriba</div>
+          )}
+        </div>
+      </div>}
+
     </div>
   );
 };
