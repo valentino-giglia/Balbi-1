@@ -4637,6 +4637,18 @@ const AgendaView = () => {
                   <Btn variant="secondary" size="sm" icon={<IconEdit />} style={{ flex: 1 }} onClick={() => { setEditTurno(selected); setSelected(null); }}>Editar</Btn>
                   <Btn variant="primary" size="sm" icon={<IconStethoscope />} style={{ flex: 1 }} onClick={() => { window._CONSULTAS_PET_ID = selected.petId; setSelected(null); if (window._goTo) window._goTo('consultas'); }}>Iniciar consulta</Btn>
                 </div>
+                <div style={{ marginTop: 8 }}>
+                  <button onClick={async () => {
+                    if (!window.confirm('¿Eliminar este turno? Esta acción no se puede deshacer.')) return;
+                    try {
+                      await window.Auth.del(`/turnos/${selected.id}`);
+                      setTurnos(prev => prev.filter(t => t.id !== selected.id));
+                      setSelected(null);
+                    } catch { alert('No se pudo eliminar el turno'); }
+                  }} style={{ width: '100%', height: 34, borderRadius: 8, background: 'transparent', border: '1px solid #E8D0D0', color: '#C2185B', fontWeight: 600, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>
+                    Eliminar turno
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -4702,7 +4714,7 @@ const Precios = () => {
     }).catch(() => {});
   }, []);
 
-  const recargarSrv = () => window.Auth.get('/servicios?pageSize=100').then(r => setServicios(Array.isArray(r) ? r : (r.data || []))).catch(() => {});
+  const recargarSrv = () => window.Auth.get('/servicios?pageSize=100&estado=ACTIVO').then(r => setServicios(Array.isArray(r) ? r : (r.data || []))).catch(() => {});
 
   const crearSrv = async () => {
     if (!nuevoSrv.nombre || !nuevoSrv.codigo) { setSrvMsg('Nombre y código requeridos'); return; }
@@ -4796,7 +4808,7 @@ const Precios = () => {
   const inpSrv = { height: 36, padding: '0 10px', border: '1px solid #E0DCE0', borderRadius: 8, fontSize: 13, fontFamily: 'inherit', outline: 'none', width: '100%', boxSizing: 'border-box' };
 
   return (
-    <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16, overflow: 'auto', flex: 1 }}>
+    <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16, overflow: 'auto', flex: 1, minHeight: 0 }}>
 
       {/* Sub-pestañas */}
       <div style={{ display: 'flex', gap: 4, background: '#F4F0F2', padding: 4, borderRadius: 10, alignSelf: 'flex-start' }}>
@@ -5377,7 +5389,7 @@ const ConfiguracionView = ({ currentUser }) => {
   const [savingProf, setSavingProf] = React.useState(false);
   const [profsMsg, setProfsMsg] = React.useState('');
 
-  const recargarProfs = () => window.Auth.get('/profesionales?pageSize=100').then(r => setProfs(Array.isArray(r) ? r : (r.data || []))).catch(() => {});
+  const recargarProfs = () => window.Auth.get('/profesionales?pageSize=100&estado=ACTIVO').then(r => setProfs(Array.isArray(r) ? r : (r.data || []))).catch(() => {});
 
   React.useEffect(() => { recargarProfs(); }, []);
 
@@ -5417,7 +5429,7 @@ const ConfiguracionView = ({ currentUser }) => {
   const [savingSrv, setSavingSrv] = React.useState(false);
   const [srvMsg, setSrvMsg] = React.useState('');
 
-  const recargarSrv = () => window.Auth.get('/servicios?pageSize=100').then(r => setServiciosList(Array.isArray(r) ? r : (r.data || []))).catch(() => {});
+  const recargarSrv = () => window.Auth.get('/servicios?pageSize=100&estado=ACTIVO').then(r => setServiciosList(Array.isArray(r) ? r : (r.data || []))).catch(() => {});
 
   React.useEffect(() => { recargarSrv(); }, []);
 
@@ -5688,8 +5700,8 @@ const ConfiguracionView = ({ currentUser }) => {
           </div>
         </div>
 
-        {/* ── Tipos de servicios ── */}
-        <div style={{ marginTop: 36 }}>
+        {/* Tipos de servicios movidos a pestaña Precios → sub-tab Servicios */}
+        {false && <div style={{ marginTop: 36 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
             <div>
               <div style={{ fontSize: 16, fontWeight: 700 }}>Tipos de servicios</div>
@@ -5752,7 +5764,7 @@ const ConfiguracionView = ({ currentUser }) => {
             })}
             {serviciosList.length === 0 && <div style={{ padding: '28px 16px', textAlign: 'center', color: '#999', fontSize: 13 }}>No hay servicios registrados</div>}
           </div>
-        </div>
+        </div>}
 
         {/* ── Categorías de lista de precios ── */}
         <div style={{ marginTop: 36, marginBottom: 32 }}>

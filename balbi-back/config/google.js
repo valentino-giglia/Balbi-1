@@ -13,10 +13,15 @@ const SCOPES = [
 
 function getAuthClient() {
   const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
-  if (!raw) {
-    throw new Error('GOOGLE_SERVICE_ACCOUNT_JSON no está configurado');
+  if (!raw) throw new Error('GOOGLE_SERVICE_ACCOUNT_JSON no está configurado');
+
+  let credentials;
+  try {
+    credentials = JSON.parse(raw);
+  } catch {
+    // Railway puede almacenar el valor con saltos de línea reales en lugar de \n
+    credentials = JSON.parse(raw.replace(/\n/g, '\\n'));
   }
-  const credentials = typeof raw === 'string' ? JSON.parse(raw) : raw;
   return new google.auth.GoogleAuth({ credentials, scopes: SCOPES });
 }
 
