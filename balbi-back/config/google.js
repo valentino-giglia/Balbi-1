@@ -22,6 +22,12 @@ function getAuthClient() {
     // Railway puede almacenar el valor con saltos de línea reales en lugar de \n
     credentials = JSON.parse(raw.replace(/\n/g, '\\n'));
   }
+
+  // Railway a veces doble-escapea los \n de la private_key → OpenSSL no puede leer la clave PEM
+  if (credentials.private_key) {
+    credentials.private_key = credentials.private_key.replace(/\\n/g, '\n');
+  }
+
   return new google.auth.GoogleAuth({ credentials, scopes: SCOPES });
 }
 
