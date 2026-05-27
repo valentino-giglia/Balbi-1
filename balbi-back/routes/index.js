@@ -95,7 +95,8 @@ module.exports = async (app) => {
         '/api/auth/register',
         '/api/auth/login',
         '/api/servicios/publico',
-        '/api/chat/webhook'
+        '/api/chat/webhook',
+        '/api/google/test'
       ];
 
       const isPublicRoute = publicRoutes.some(route => originalUrl === route || originalUrl.startsWith(route));
