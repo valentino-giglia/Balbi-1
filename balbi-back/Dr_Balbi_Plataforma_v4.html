@@ -4676,13 +4676,15 @@ const Precios = () => {
   const [srvMsg, setSrvMsg] = useState('');
   const [showNuevoSrv, setShowNuevoSrv] = useState(false);
   const [nuevoSrv, setNuevoSrv] = useState({ nombre: '', codigo: '', duracionMinutos: 30, precio: 0, color: '#1976d2' });
+  const recargarProductos = () => window.Auth.get('/productos').then(r => {
+    const list = Array.isArray(r) ? r : (r.data || []);
+    setProducts(list);
+  }).catch(() => {});
+
   React.useEffect(() => {
     if (!window.Auth?.getToken()) return;
-    window.Auth.get('/productos').then(r => {
-      const list = Array.isArray(r) ? r : (r.data || []);
-      setProducts(list);
-    }).catch(() => {});
-    window.Auth.get('/servicios?pageSize=100').then(r => {
+    recargarProductos();
+    window.Auth.get('/servicios?pageSize=100&estado=ACTIVO').then(r => {
       setServicios(Array.isArray(r) ? r : (r.data || []));
     }).catch(() => {});
   }, []);
@@ -4728,10 +4730,10 @@ const Precios = () => {
     if (!prod) return;
     const parsed = (field === 'nombre' || field === 'categoria' || field === 'unidad' || field === 'proveedor') ? value : (parseFloat(value) || 0);
     const updated = { ...prod, [field]: parsed };
-    setProducts(products.map(p => p.id === id ? updated : p));
-    setSaved(id + ':' + field); setTimeout(() => setSaved(null), 1500);
     try {
       await window.Auth.put(`/productos/${id}`, { nombre: updated.nombre, categoria: updated.categoria, costo: updated.costo, venta: updated.venta, stock: updated.stock, unidad: updated.unidad, proveedor: updated.proveedor });
+      setProducts(prev => prev.map(p => p.id === id ? updated : p));
+      setSaved(id + ':' + field); setTimeout(() => setSaved(null), 1500);
     } catch {}
   };
 
@@ -4739,16 +4741,18 @@ const Precios = () => {
     if (!window.confirm('¿Eliminar este producto?')) return;
     try {
       await window.Auth.del(`/productos/${id}`);
-      setProducts(products.filter(p => p.id !== id));
+      recargarProductos();
     } catch {}
   };
 
   const addNew = async (data) => {
     try {
-      const res = await window.Auth.post('/productos', { nombre: data.nombre, categoria: data.categoria || '', costo: data.costo || 0, venta: data.venta || 0, stock: data.stock ?? null, unidad: data.unidad || 'unidad', proveedor: data.proveedor || '' });
-      setProducts(prev => [...prev, res]);
-    } catch {}
-    setShowNew(false);
+      await window.Auth.post('/productos', { nombre: data.nombre, categoria: data.categoria || '', costo: data.costo || 0, venta: data.venta || 0, stock: data.stock ?? null, unidad: data.unidad || 'unidad', proveedor: data.proveedor || '' });
+      setShowNew(false);
+      recargarProductos();
+    } catch(e) {
+      alert('Error al crear el producto: ' + (e.message || 'Error desconocido'));
+    }
   };
 
   const totals = products.reduce((acc, p) => {

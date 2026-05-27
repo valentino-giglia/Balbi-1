@@ -18,14 +18,15 @@ function buildCalendarEvent(turno, paciente, mascota, profesional, servicio) {
   const nombreServicio = servicio ? servicio.nombre : 'Turno';
   const nombreProfesional = profesional ? profesional.nombre : '';
 
+  const tz = 'America/Argentina/Buenos_Aires';
   return {
     summary: `${nombreServicio} — ${nombreCliente}${nombreMascota}`,
     description: [
       nombreProfesional ? `Profesional: ${nombreProfesional}` : '',
       turno.notas ? `Notas: ${turno.notas}` : ''
     ].filter(Boolean).join('\n'),
-    start: { dateTime: new Date(turno.horaInicio).toISOString() },
-    end: { dateTime: new Date(turno.horaFin).toISOString() }
+    start: { dateTime: new Date(turno.horaInicio).toISOString(), timeZone: tz },
+    end: { dateTime: new Date(turno.horaFin).toISOString(), timeZone: tz }
   };
 }
 
@@ -563,8 +564,10 @@ const eliminarTurno = async (req, res) => {
       return res.status(404).json({ error: 'Turno no encontrado' });
     }
 
+    const googleEventId = turno.googleEventId;
     await turno.update({ estado: 'BAJA' });
     res.json({ message: 'Turno eliminado correctamente' });
+    eliminarEventoCalendar(googleEventId);
   } catch (error) {
     console.error('Error eliminando turno:', error);
     res.status(500).json({ error: 'Error al eliminar turno' });

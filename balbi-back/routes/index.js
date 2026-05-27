@@ -78,6 +78,7 @@ module.exports = async (app) => {
     const productosRoutes = require('./productos');
     const alertasRoutes = require('./alertas');
     const colaRoutes = require('./cola');
+    const googleRoutes = require('./google');
 
     // Middleware para proteger endpoints salvo los públicos
     // Solo aplicar a rutas que empiecen con /api
@@ -153,6 +154,7 @@ module.exports = async (app) => {
     app.use('/api/productos', productosRoutes);
     app.use('/api/alertas', alertasRoutes);
     app.use('/api/cola', colaRoutes);
+    app.use('/api/google', googleRoutes);
     app.use('/api/v1', apiV1Routes);
 
     console.log('✅ Todas las rutas registradas correctamente');
