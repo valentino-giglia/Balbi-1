@@ -1279,6 +1279,7 @@ const Dashboard = ({ goTo, openSearch }) => {
     || (!proxima && guardiaActiva ? (() => { const idx = vets.findIndex(v => v.id === guardiaActiva.vetId); return vets[(idx + 1) % vets.length]; })() : undefined);
 
   const [_dashTick, _setDashTick] = useStateD(0);
+  const _avanzandoGuardia = React.useRef(false);
   useEffectD(() => { const t = setInterval(() => _setDashTick(n => n + 1), 1000); return () => clearInterval(t); }, []);
   const { restante, progreso } = (() => {
     if (!guardiaActiva?.desde || !guardiaActiva?.hasta) return { restante: '--', progreso: 0 };
@@ -1291,6 +1292,21 @@ const Dashboard = ({ goTo, openSearch }) => {
     const pct = totalMin > 0 ? Math.min(100, Math.max(0, Math.round((nowMin - desdeMin) / totalMin * 100))) : 0;
     const remMin = Math.max(0, hastaMin - nowMin);
     const rh = Math.floor(remMin / 60), rm = remMin % 60;
+
+    // Auto-avanzar cuando termina la guardia activa
+    if (remMin === 0 && guardiaActiva && !_avanzandoGuardia.current) {
+      _avanzandoGuardia.current = true;
+      const siguiente = guardiasOrdenadas.find(g =>
+        g.id !== guardiaActiva.id &&
+        ((g.fecha > guardiaActiva.fecha) ||
+         (g.fecha === guardiaActiva.fecha && (g.desde || '') >= (guardiaActiva.hasta || '')))
+      );
+      Promise.all([
+        window.Auth.put(`/guardias/${guardiaActiva.id}`, { profesionalID: guardiaActiva.vetId, tipo: guardiaActiva.tipo, fecha: guardiaActiva.fecha, desde: guardiaActiva.desde, hasta: guardiaActiva.hasta, activa: false }),
+        siguiente ? window.Auth.put(`/guardias/${siguiente.id}`, { profesionalID: siguiente.vetId, tipo: siguiente.tipo, fecha: siguiente.fecha, desde: siguiente.desde, hasta: siguiente.hasta, activa: true }) : Promise.resolve()
+      ]).then(() => { recargarGuardias(); _avanzandoGuardia.current = false; }).catch(() => { _avanzandoGuardia.current = false; });
+    }
+
     return { restante: rh > 0 ? `${rh}h ${rm}min` : `${rm}min`, progreso: pct };
   })();
 
@@ -4768,7 +4784,8 @@ const Precios = () => {
   const inpSrv = { height: 36, padding: '0 10px', border: '1px solid #E0DCE0', borderRadius: 8, fontSize: 13, fontFamily: 'inherit', outline: 'none', width: '100%', boxSizing: 'border-box' };
 
   return (
-    <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16, overflow: 'auto', flex: 1, minHeight: 0 }}>
+    <div style={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
+    <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
 
       {/* Sub-pestañas */}
       <div style={{ display: 'flex', gap: 4, background: '#F4F0F2', padding: 4, borderRadius: 10, alignSelf: 'flex-start' }}>
@@ -4926,6 +4943,7 @@ const Precios = () => {
         </div>
       </div>}
 
+    </div>
     </div>
   );
 };
