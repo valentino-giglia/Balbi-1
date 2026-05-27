@@ -4344,9 +4344,6 @@ const AgendaView = () => {
   const [selected, setSelected] = useState(null);
   const [nuevoTurno, setNuevoTurno] = useState(false);
   const [editTurno, setEditTurno] = useState(null);
-  const [gcalToken, setGcalToken] = useState(null);
-  const [showGCalConfig, setShowGCalConfig] = useState(false);
-  const [calSyncMsg, setCalSyncMsg] = useState('');
 
 
   // Carga turnos desde la API al montar
@@ -4410,17 +4407,6 @@ const AgendaView = () => {
       fecha: startDate,
     };
     setTurnos(prev => [...prev, newT]);
-    if (gcalToken) {
-      try {
-        const pet = (window.PETS || []).find(p => p.id === savedTurno.mascotaID);
-        const owner = pet ? (window.CLIENTS || []).find(c => c.id === pet.ownerId) : null;
-        await window.createCalEvent(gcalToken, newT, pet, owner);
-        setCalSyncMsg('Turno agregado a Google Calendar');
-      } catch {
-        setCalSyncMsg('Error al sincronizar con Calendar');
-      }
-      setTimeout(() => setCalSyncMsg(''), 3000);
-    }
   };
 
   const ROW_H = 56; // px per hour
@@ -4501,17 +4487,10 @@ const AgendaView = () => {
           <button style={{ width: 32, height: 32, border: '1px solid #E0DCE0', borderRadius: '0 8px 8px 0', background: 'white', cursor: 'pointer', color: '#555', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><IconChevron size={16} /></button>
         </div>
         <div style={{ fontSize: 17, fontWeight: 700 }}>Mayo 2026</div>
-        {gcalToken ? (
-          <Pill color="#1F8A5B" size="md">
-            <span style={{ width: 6, height: 6, background: '#1F8A5B', borderRadius: '50%', display: 'inline-block' }} />
-            <span style={{ marginLeft: 4 }}>{calSyncMsg || 'Conectado a Google Calendar'}</span>
-          </Pill>
-        ) : (
-          <button onClick={() => setShowGCalConfig(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', border: '1px solid #E0DCE0', borderRadius: 20, background: 'white', cursor: 'pointer', fontSize: 12, fontWeight: 600, color: '#555' }}>
-            <svg width="14" height="14" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
-            Conectar Google Calendar
-          </button>
-        )}
+        <Pill color="#1F8A5B" size="md">
+          <span style={{ width: 6, height: 6, background: '#1F8A5B', borderRadius: '50%', display: 'inline-block' }} />
+          <span style={{ marginLeft: 4 }}>Sync Calendar automático</span>
+        </Pill>
         <div style={{ flex: 1 }} />
         <div style={{ display: 'flex', background: '#F4F0F2', padding: 3, borderRadius: 8 }}>
           {['día', 'semana', 'mes'].map(v => (
@@ -4655,7 +4634,6 @@ const AgendaView = () => {
         );
       })()}
 
-      {showGCalConfig && <window.GoogleConfigModal mode="calendar" onClose={() => setShowGCalConfig(false)} onConnected={(tok) => { setGcalToken(tok); setCalSyncMsg('Conectado'); setTimeout(() => setCalSyncMsg(''), 2000); }} />}
       {nuevoTurno && <NuevoTurnoModal onClose={() => setNuevoTurno(false)} onSave={addTurno} />}
       {editTurno && <NuevoTurnoModal editId={editTurno.id} onClose={() => setEditTurno(null)} onSave={(res) => {
         setEditTurno(null);
@@ -4691,8 +4669,6 @@ const Precios = () => {
   const [editing, setEditing] = useState(null);
   const [saved, setSaved] = useState(null);
   const [showNew, setShowNew] = useState(false);
-  const [gsheetsToken, setGsheetsToken] = useState(null);
-  const [showSheetsConfig, setShowSheetsConfig] = useState(false);
   // servicios
   const [servicios, setServicios] = useState([]);
   const [editSrv, setEditSrv] = useState(null);
@@ -4700,9 +4676,6 @@ const Precios = () => {
   const [srvMsg, setSrvMsg] = useState('');
   const [showNuevoSrv, setShowNuevoSrv] = useState(false);
   const [nuevoSrv, setNuevoSrv] = useState({ nombre: '', codigo: '', duracionMinutos: 30, precio: 0, color: '#1976d2' });
-  const [syncing, setSyncing] = useState(false);
-  const [syncMsg, setSyncMsg] = useState('');
-
   React.useEffect(() => {
     if (!window.Auth?.getToken()) return;
     window.Auth.get('/productos').then(r => {
@@ -4741,23 +4714,6 @@ const Precios = () => {
     if (!window.confirm('¿Eliminar este servicio?')) return;
     try { await window.Auth.del(`/servicios/${id}`); recargarSrv(); } catch { setSrvMsg('Error al eliminar'); }
   };
-
-  React.useEffect(() => {
-    if (!gsheetsToken) return;
-    const sheetId = window.GConf?.getSheetId();
-    if (!sheetId) return;
-    const timer = setTimeout(async () => {
-      setSyncing(true);
-      try {
-        await window.syncToSheets(gsheetsToken, sheetId, products);
-        setSyncMsg('Sincronizado hace un momento');
-      } catch {
-        setSyncMsg('Error al sincronizar');
-      }
-      setSyncing(false);
-    }, 2000);
-    return () => clearTimeout(timer);
-  }, [products, gsheetsToken]);
 
   const cats = ['todos', ...Array.from(new Set(products.map(p => p.categoria).filter(Boolean)))];
   const filtered = products.filter(p => (cat === 'todos' || p.categoria === cat) && p.nombre.toLowerCase().includes(q.toLowerCase()));
@@ -4829,29 +4785,10 @@ const Precios = () => {
           <svg width="20" height="20" viewBox="0 0 48 48"><path fill="#0F9D58" d="M37 4H11a3 3 0 00-3 3v34a3 3 0 003 3h26a3 3 0 003-3V7a3 3 0 00-3-3z"/><path fill="white" d="M14 14h20v3H14zM14 19h20v3H14zM14 24h20v3H14zM14 29h20v3H14zM14 34h20v3H14zM21 14h2v23h-2zM27 14h2v23h-2z"/></svg>
         </div>
         <div style={{ flex: 1 }}>
-          {gsheetsToken ? (
-            <>
-              <div style={{ fontSize: 13.5, fontWeight: 700, color: '#1A1A1A' }}>{syncing ? 'Sincronizando…' : 'Conectado a Google Sheets'}</div>
-              <div style={{ fontSize: 11.5, color: '#888', marginTop: 1 }}>{syncMsg || 'Los cambios se sincronizan automáticamente'}</div>
-            </>
-          ) : (
-            <>
-              <div style={{ fontSize: 13.5, fontWeight: 700, color: '#1A1A1A' }}>Conectar con Google Sheets</div>
-              <div style={{ fontSize: 11.5, color: '#888', marginTop: 1 }}>Los precios se sincronizarán automáticamente al cambiar</div>
-            </>
-          )}
+          <div style={{ fontSize: 13.5, fontWeight: 700, color: '#1A1A1A' }}>Conectado a Google Sheets</div>
+          <div style={{ fontSize: 11.5, color: '#888', marginTop: 1 }}>Los cambios se sincronizan automáticamente</div>
         </div>
-        {gsheetsToken ? (
-          <>
-            <Btn variant="secondary" size="sm" icon={<IconCheck />} onClick={() => { const id = window.GConf?.getSheetId(); if (id) window.open(`https://docs.google.com/spreadsheets/d/${id}`, '_blank'); }}>Abrir en Sheets</Btn>
-            <Btn variant="soft" size="sm" onClick={async () => { const id = window.GConf?.getSheetId(); if (!id) return; setSyncing(true); try { await window.syncToSheets(gsheetsToken, id, products); setSyncMsg('Sincronizado ahora'); } catch { setSyncMsg('Error al sincronizar'); } setSyncing(false); setTimeout(() => setSyncMsg(''), 3000); }}>{syncing ? 'Sincronizando…' : 'Sincronizar ahora'}</Btn>
-          </>
-        ) : (
-          <button onClick={() => setShowSheetsConfig(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', border: '1px solid #E0DCE0', borderRadius: 8, background: 'white', cursor: 'pointer', fontSize: 12, fontWeight: 600, color: '#555' }}>
-            <svg width="14" height="14" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
-            Conectar con Google
-          </button>
-        )}
+        <Pill color="#1F8A5B" size="md"><span style={{ width: 7, height: 7, borderRadius: '50%', background: '#1F8A5B', display: 'inline-block' }} />  <span style={{ marginLeft: 4 }}>Sync automático</span></Pill>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
@@ -4912,7 +4849,6 @@ const Precios = () => {
         })}
       </div>
 
-      {showSheetsConfig && <window.GoogleConfigModal mode="sheets" onClose={() => setShowSheetsConfig(false)} onConnected={(tok) => { setGsheetsToken(tok); setSyncMsg('Conectado — sincronizando…'); }} />}
       {showNew && <NewProductModal onClose={() => setShowNew(false)} onSave={addNew} cats={cats.filter(c => c !== 'todos')} />}
       </>}
 
@@ -5073,210 +5009,6 @@ const NewProductModal = ({ onClose, onSave, cats }) => {
 };
 
 window.Precios = Precios;
-</script>
-
-
-<script type="text/babel">
-// ============================================================
-// GOOGLE INTEGRATION — Calendar + Sheets
-// ============================================================
-
-// Mapeo índice de día → fecha real de la semana mostrada en la agenda
-const GCAL_DAY_DATES = _WEEK_DATES;
-
-// Config persistida en localStorage
-const GConf = {
-  getClientId:    () => localStorage.getItem('balbi_gclient_id') || '',
-  setClientId:    (v) => localStorage.setItem('balbi_gclient_id', v),
-  getSheetId:     () => localStorage.getItem('balbi_gsheet_id') || '',
-  setSheetId:     (v) => localStorage.setItem('balbi_gsheet_id', v),
-  parseSheetId:   (s) => { const m = (s||'').match(/\/d\/([a-zA-Z0-9_-]+)/); return m ? m[1] : s; },
-  getSheetRawUrl: () => localStorage.getItem('balbi_gsheet_url') || '',
-  setSheetRawUrl: (v) => localStorage.setItem('balbi_gsheet_url', v),
-};
-window.GConf = GConf;
-
-// Carga el script de Google Identity Services una sola vez
-let _gisLoadPromise = null;
-const ensureGIS = () => {
-  if (window.google && window.google.accounts) return Promise.resolve();
-  if (_gisLoadPromise) return _gisLoadPromise;
-  _gisLoadPromise = new Promise((resolve) => {
-    const s = document.createElement('script');
-    s.src = 'https://accounts.google.com/gsi/client';
-    s.onload = resolve;
-    s.onerror = () => { _gisLoadPromise = null; resolve(); };
-    document.head.appendChild(s);
-  });
-  return _gisLoadPromise;
-};
-
-// Solicita un token OAuth para el scope dado (abre popup de Google)
-const requestGToken = async (scope) => {
-  const clientId = GConf.getClientId();
-  if (!clientId) throw new Error('Ingresá el Client ID de Google primero.');
-  await ensureGIS();
-  if (!window.google || !window.google.accounts) throw new Error('No se pudo cargar Google Identity Services. Verificá tu conexión.');
-  return new Promise((resolve, reject) => {
-    const tc = window.google.accounts.oauth2.initTokenClient({
-      client_id: clientId,
-      scope,
-      callback: (r) => r.error
-        ? reject(new Error(r.error_description || r.error))
-        : resolve(r.access_token),
-    });
-    tc.requestAccessToken({ prompt: '' });
-  });
-};
-window.requestGToken = requestGToken;
-
-// ---- Google Calendar API ----
-const createCalEvent = async (token, turno, pet, owner) => {
-  const date  = GCAL_DAY_DATES[turno.day] || GCAL_DAY_DATES[2];
-  const pad   = (n) => String(Math.floor(n)).padStart(2, '0');
-  const hh    = Math.floor(turno.time);
-  const mm    = (turno.time % 1) ? 30 : 0;
-  const endMin = mm + Math.round(turno.dur * 60);
-  const endHh  = hh + Math.floor(endMin / 60);
-  const endMm  = endMin % 60;
-  const tz = 'America/Argentina/Buenos_Aires';
-
-  const body = {
-    summary: `${turno.motivo} — ${pet?.name || 'Paciente'}`,
-    description: [
-      pet   ? `Paciente: ${pet.name} (${pet.species} · ${pet.breed})` : '',
-      owner ? `Dueño/a: ${owner.name} · ${owner.phone}` : '',
-      `Profesional: ${turno.vet}`,
-    ].filter(Boolean).join('\n'),
-    start: { dateTime: `${date}T${pad(hh)}:${pad(mm)}:00`, timeZone: tz },
-    end:   { dateTime: `${date}T${pad(endHh)}:${pad(endMm)}:00`, timeZone: tz },
-  };
-
-  const r = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events', {
-    method: 'POST',
-    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-  if (!r.ok) { const e = await r.json(); throw new Error(e.error?.message || 'Error Calendar API'); }
-  return r.json();
-};
-window.createCalEvent = createCalEvent;
-
-// ---- Google Sheets API ----
-const SHEETS_HEADER = ['Categoría','Nombre','Costo','Precio Venta','Margen %','Stock','Unidad','Proveedor'];
-
-const syncToSheets = async (token, sheetId, products) => {
-  const marg = (c, v) => c > 0 ? ((v - c) / c * 100).toFixed(1) + '%' : '';
-  const values = [
-    SHEETS_HEADER,
-    ...products.map(p => [
-      p.categoria, p.nombre, p.costo ?? 0, p.venta ?? 0,
-      marg(p.costo, p.venta), p.stock ?? '', p.unidad ?? '', p.proveedor ?? '',
-    ]),
-  ];
-  const r = await fetch(
-    `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/Precios!A1?valueInputOption=USER_ENTERED`,
-    {
-      method: 'PUT',
-      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ values }),
-    }
-  );
-  if (!r.ok) { const e = await r.json(); throw new Error(e.error?.message || 'Error Sheets API'); }
-  return r.json();
-};
-window.syncToSheets = syncToSheets;
-
-// ---- Modal de configuración compartido ----
-const GoogleConfigModal = ({ mode, onClose, onConnected }) => {
-  const isSheets = mode === 'sheets';
-  const scope = isSheets
-    ? 'https://www.googleapis.com/auth/spreadsheets'
-    : 'https://www.googleapis.com/auth/calendar.events';
-
-  const [clientId,  setClientId]  = React.useState(GConf.getClientId());
-  const [sheetUrl,  setSheetUrl]  = React.useState(GConf.getSheetRawUrl());
-  const [loading,   setLoading]   = React.useState(false);
-  const [err,       setErr]       = React.useState('');
-
-  const handleConnect = async () => {
-    if (!clientId.trim()) { setErr('Ingresá el Client ID.'); return; }
-    if (isSheets && !sheetUrl.trim()) { setErr('Ingresá la URL de la planilla.'); return; }
-    setLoading(true); setErr('');
-    GConf.setClientId(clientId.trim());
-    if (isSheets) {
-      GConf.setSheetRawUrl(sheetUrl.trim());
-      GConf.setSheetId(GConf.parseSheetId(sheetUrl.trim()));
-    }
-    try {
-      const token = await requestGToken(scope);
-      onConnected(token);
-      onClose();
-    } catch (e) {
-      setErr(e.message || 'Error al autenticar con Google.');
-    } finally { setLoading(false); }
-  };
-
-  const labelStep = (n, txt) => (
-    <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-      <div style={{ width: 20, height: 20, borderRadius: '50%', background: '#E0D9F0', color: '#7A3FBF', fontSize: 11, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 }}>{n}</div>
-      <div style={{ fontSize: 12.5, color: '#444', lineHeight: 1.6 }}>{txt}</div>
-    </div>
-  );
-
-  return (
-    <Modal open={true} onClose={onClose}
-      title={isSheets ? 'Conectar Google Sheets' : 'Conectar Google Calendar'}
-      width={520}
-      footer={<>
-        <Btn variant="ghost" onClick={onClose}>Cancelar</Btn>
-        <Btn variant="primary" icon={<IconCheck />} onClick={handleConnect} disabled={loading}>
-          {loading ? 'Conectando…' : 'Autorizar con Google'}
-        </Btn>
-      </>}
-    >
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-        <div style={{ padding: 14, background: '#F5F3FF', border: '1px solid #DDD6FE', borderRadius: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: '#7A3FBF', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 2 }}>Cómo configurar</div>
-          {labelStep(1, <span>Entrá a <strong>console.cloud.google.com</strong> → <em>APIs y servicios</em> → Biblioteca</span>)}
-          {labelStep(2, <span>Habilitá la API de <strong>{isSheets ? 'Google Sheets' : 'Google Calendar'}</strong></span>)}
-          {labelStep(3, <span>Credenciales → <em>Crear credencial</em> → <em>ID de cliente OAuth 2.0</em> → Aplicación web</span>)}
-          {labelStep(4, <span>En "Orígenes autorizados" agregá <code style={{ background: 'rgba(0,0,0,0.06)', padding: '1px 5px', borderRadius: 3, fontFamily: 'monospace' }}>http://localhost:3000</code></span>)}
-          {labelStep(5, <span>Copiá el <strong>Client ID</strong> y pegalo abajo</span>)}
-        </div>
-
-        <Field label="Google OAuth Client ID">
-          <Input
-            placeholder="123456789-abc...apps.googleusercontent.com"
-            value={clientId}
-            onChange={(e) => setClientId(e.target.value)}
-          />
-        </Field>
-
-        {isSheets && (
-          <Field label="URL de la planilla de Google Sheets">
-            <Input
-              placeholder="https://docs.google.com/spreadsheets/d/TU_ID_AQUI/..."
-              value={sheetUrl}
-              onChange={(e) => setSheetUrl(e.target.value)}
-            />
-            <div style={{ fontSize: 11, color: '#888', marginTop: 4 }}>
-              La planilla debe tener una hoja llamada <strong>Precios</strong>. Si no existe, se escribe en la primera hoja.
-            </div>
-          </Field>
-        )}
-
-        {err && (
-          <div style={{ fontSize: 12.5, color: '#C2185B', background: '#FFF0F4', padding: '10px 12px', borderRadius: 8, border: '1px solid #F2D5E2' }}>
-            {err}
-          </div>
-        )}
-      </div>
-    </Modal>
-  );
-};
-
-window.GoogleConfigModal = GoogleConfigModal;
 </script>
 
 
