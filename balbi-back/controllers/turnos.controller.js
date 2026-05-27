@@ -13,7 +13,7 @@ const { getCalendar, CALENDAR_ID } = require('../config/google');
 // ── Google Calendar helpers ──────────────────────────────────────
 
 function buildCalendarEvent(turno, paciente, mascota, profesional, servicio) {
-  const nombreCliente = paciente ? paciente.nombre : 'Sin cliente';
+  const nombreCliente = paciente?.nombre || mascota?.paciente?.nombre || 'Sin propietario';
   const nombreMascota = mascota ? ` (${mascota.nombre})` : '';
   const nombreServicio = servicio ? servicio.nombre : 'Turno';
   const nombreProfesional = profesional ? profesional.nombre : '';
@@ -358,31 +358,16 @@ const crearTurno = async (req, res) => {
 
     const turnoCompleto = await Turnos.findByPk(turno.id, {
       include: [
-        {
-          model: Pacientes,
-          as: 'paciente',
-          required: false
-        },
+        { model: Pacientes, as: 'paciente', required: false },
         {
           model: Mascotas,
           as: 'mascota',
-          required: false
+          required: false,
+          include: [{ model: Pacientes, as: 'paciente', required: false }]
         },
-        {
-          model: Profesionales,
-          as: 'profesional',
-          required: false
-        },
-        {
-          model: Servicios,
-          as: 'servicio',
-          required: false
-        },
-        {
-          model: Consultas,
-          as: 'consulta',
-          required: false
-        }
+        { model: Profesionales, as: 'profesional', required: false },
+        { model: Servicios, as: 'servicio', required: false },
+        { model: Consultas, as: 'consulta', required: false }
       ]
     });
 
@@ -493,31 +478,16 @@ const actualizarTurno = async (req, res) => {
 
     const turnoCompleto = await Turnos.findByPk(turno.id, {
       include: [
-        {
-          model: Pacientes,
-          as: 'paciente',
-          required: false
-        },
+        { model: Pacientes, as: 'paciente', required: false },
         {
           model: Mascotas,
           as: 'mascota',
-          required: false
+          required: false,
+          include: [{ model: Pacientes, as: 'paciente', required: false }]
         },
-        {
-          model: Profesionales,
-          as: 'profesional',
-          required: false
-        },
-        {
-          model: Servicios,
-          as: 'servicio',
-          required: false
-        },
-        {
-          model: Consultas,
-          as: 'consulta',
-          required: false
-        }
+        { model: Profesionales, as: 'profesional', required: false },
+        { model: Servicios, as: 'servicio', required: false },
+        { model: Consultas, as: 'consulta', required: false }
       ]
     });
 
@@ -595,32 +565,17 @@ const cancelarTurno = async (req, res) => {
 
     const turnoCompleto = await Turnos.findByPk(turno.id, {
       include: [
-        {
-          model: Pacientes,
-          as: 'paciente',
-          required: false
-        },
+        { model: Pacientes, as: 'paciente', required: false },
         {
           model: Mascotas,
           as: 'mascota',
-          required: false
+          required: false,
+          include: [{ model: Pacientes, as: 'paciente', required: false }]
         },
-        {
-          model: Profesionales,
-          as: 'profesional',
-            required: false
-        },
-          {
-            model: Servicios,
-            as: 'servicio',
-            required: false
-          },
-        {
-          model: Consultas,
-          as: 'consulta',
-          required: false
-        }
-        ]
+        { model: Profesionales, as: 'profesional', required: false },
+        { model: Servicios, as: 'servicio', required: false },
+        { model: Consultas, as: 'consulta', required: false }
+      ]
     });
 
     res.json(turnoCompleto);
