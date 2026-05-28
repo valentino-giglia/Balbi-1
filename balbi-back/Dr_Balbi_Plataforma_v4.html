@@ -1287,10 +1287,15 @@ const Dashboard = ({ goTo, openSearch }) => {
     const nowMin = now.getUTCHours() * 60 + now.getUTCMinutes();
     const [dh, dm] = guardiaActiva.desde.split(':').map(Number);
     const [hh, hm] = guardiaActiva.hasta.split(':').map(Number);
-    const desdeMin = dh * 60 + dm, hastaMin = hh * 60 + hm;
+    const desdeMin = dh * 60 + dm;
+    // Si hasta <= desde es guardia nocturna o de 24hs → sumar 24h al hasta
+    let hastaMin = hh * 60 + hm;
+    if (hastaMin <= desdeMin) hastaMin += 24 * 60;
+    // Si la hora actual es antes del inicio (guardia aún no empezó hoy) sumar 24h para comparar
+    const adjNow = nowMin < desdeMin ? nowMin + 24 * 60 : nowMin;
     const totalMin = hastaMin - desdeMin;
-    const pct = totalMin > 0 ? Math.min(100, Math.max(0, Math.round((nowMin - desdeMin) / totalMin * 100))) : 0;
-    const remMin = Math.max(0, hastaMin - nowMin);
+    const pct = totalMin > 0 ? Math.min(100, Math.max(0, Math.round((adjNow - desdeMin) / totalMin * 100))) : 0;
+    const remMin = Math.max(0, hastaMin - adjNow);
     const rh = Math.floor(remMin / 60), rm = remMin % 60;
 
     // Auto-avanzar cuando termina la guardia activa (solo una vez por guardia)
@@ -5360,7 +5365,7 @@ const ConfiguracionView = ({ currentUser }) => {
           {/* Lista de usuarios */}
           <div style={{ background: 'white', border: '1px solid #EFEAEE', borderRadius: 12, overflow: 'hidden' }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr 120px 40px', padding: '9px 16px', background: '#FAFAF8', fontSize: 10.5, fontWeight: 700, color: '#888', letterSpacing: 0.4, textTransform: 'uppercase', borderBottom: '1px solid #EFEAEE' }}>
-              <div>Nombre</div><div>Usuario (email)</div><div>Rol</div><div></div>
+              <div>Nombre</div><div>Usuario</div><div>Rol</div><div></div>
             </div>
             {usuarios.map(u => {
               const isEditing = editUsr?.id === u.id;
@@ -5670,14 +5675,14 @@ const LoginScreen = ({ onLogin }) => {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div>
             <label style={{ fontSize: 12, fontWeight: 600, color: '#666', display: 'block', marginBottom: 6 }}>Usuario</label>
-            <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="admin1" type="text"
+            <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="usuario" type="text"
               onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
               style={{ width: '100%', height: 42, padding: '0 14px', border: '1px solid #E0DCE0', borderRadius: 8, fontSize: 14, fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }} />
           </div>
           <div>
             <label style={{ fontSize: 12, fontWeight: 600, color: '#666', display: 'block', marginBottom: 6 }}>Contraseña</label>
             <div style={{ position: 'relative' }}>
-              <input value={pass} onChange={(e) => setPass(e.target.value)} placeholder="••••••••" type={showPass ? 'text' : 'password'}
+              <input value={pass} onChange={(e) => setPass(e.target.value)} placeholder="contraseña" type={showPass ? 'text' : 'password'}
                 onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
                 style={{ width: '100%', height: 42, padding: '0 44px 0 14px', border: '1px solid #E0DCE0', borderRadius: 8, fontSize: 14, fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }} />
               <button type="button" onClick={() => setShowPass(!showPass)}
