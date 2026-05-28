@@ -1351,14 +1351,12 @@ const Dashboard = ({ goTo, openSearch }) => {
         onEditGuardias={() => setEditGuardias(true)}
       />
 
-      {alertas.length > 0 && (
-        <AlertasBand
-          alertas={alertas}
-          onEdit={(a) => setEditAlerta(a)}
-          onResolver={async (id) => { try { await window.Auth.put(`/alertas/${id}/resolver`, {}); } catch {} setAlertas(alertas.filter(a => a.id !== id)); }}
-          onAdd={() => setEditAlerta({ id: null, tipo: 'medicacion', petName: '', msg: '', detalle: '', minutos: 15, severity: 'critico' })}
-        />
-      )}
+      <AlertasBand
+        alertas={alertas}
+        onEdit={(a) => setEditAlerta(a)}
+        onResolver={async (id) => { try { await window.Auth.put(`/alertas/${id}/resolver`, {}); } catch {} setAlertas(alertas.filter(a => a.id !== id)); }}
+        onAdd={() => setEditAlerta({ id: null, tipo: 'medicacion', petName: '', msg: '', detalle: '', minutos: 15, severity: 'critico' })}
+      />
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14 }}>
         {kpis.map((k, i) => <KPICard key={i} {...k} />)}
@@ -1382,7 +1380,20 @@ const Dashboard = ({ goTo, openSearch }) => {
         />
       </div>
 
-      <TurnosDia vets={vets} />
+      <TurnosDia vets={vets} onIngresarCola={async (t) => {
+        try {
+          await window.Auth.post('/cola', {
+            petName: t.mascota?.nombre || 'Sin nombre',
+            species: t.mascota?.especie || 'Otro',
+            ownerName: t.paciente?.nombre || t.mascota?.paciente?.nombre || '',
+            motivo: t.servicio?.nombre || t.notas || 'Consulta',
+            triage: 'amarillo',
+            primera: false,
+            llegada: window.timeAR ? window.timeAR() : new Date().toTimeString().slice(0,5),
+          });
+          recargarCola();
+        } catch {}
+      }} />
 
       <div style={{ textAlign: 'center', color: '#999', fontSize: 11.5, padding: '4px 0 8px' }}>
         📊 Las estadísticas y gráficos analíticos se movieron a <a onClick={() => goTo && goTo('agenda')} style={{ color: '#A3007B', cursor: 'pointer', fontWeight: 600 }}>Análisis</a> · Esta vista es operativa en tiempo real
@@ -1542,6 +1553,17 @@ const GuardiaHero = ({ guardia, vet, proxima, proxVet, restante, progreso, onEdi
 };
 
 const AlertasBand = ({ alertas, onEdit, onResolver, onAdd }) => {
+  if (alertas.length === 0) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: '#FAFAF8', border: '1px dashed #E0DCE0', borderRadius: 10 }}>
+        <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#CCC', display: 'inline-block', flexShrink: 0 }} />
+        <span style={{ fontSize: 12, color: '#999', flex: 1 }}>Sin alertas operativas activas</span>
+        <button onClick={onAdd} style={{ background: 'transparent', border: 'none', color: '#A3007B', fontSize: 11.5, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, padding: 0, fontFamily: 'inherit', flexShrink: 0 }}>
+          <IconPlus size={12} /> Agregar alerta
+        </button>
+      </div>
+    );
+  }
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -2190,7 +2212,7 @@ const CierreGuardiaModal = ({ vet, proxVet, onClose, onConfirm }) => (
 );
 
 // ─── Turnos del día — solo pendientes/activos ────────────────────────────────
-const TurnosDia = React.memo(({ vets }) => {
+const TurnosDia = React.memo(({ vets, onIngresarCola }) => {
   const [turnos, setTurnos] = useStateD([]);
   const [loading, setLoading] = useStateD(true);
   const [tick, setTick] = useStateD(0);
@@ -2249,7 +2271,7 @@ const TurnosDia = React.memo(({ vets }) => {
 
       {!loading && pendientes.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '56px 1fr 1fr 1fr 90px 120px', gap: 10, padding: '6px 10px', fontSize: 10.5, fontWeight: 700, color: '#999', letterSpacing: 0.4, textTransform: 'uppercase', borderBottom: '1px solid #F4F0F2' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '56px 1fr 1fr 1fr 90px 1fr', gap: 10, padding: '6px 10px', fontSize: 10.5, fontWeight: 700, color: '#999', letterSpacing: 0.4, textTransform: 'uppercase', borderBottom: '1px solid #F4F0F2' }}>
             <div>Hora</div><div>Mascota</div><div>Titular</div><div>Veterinario</div><div>Estado</div><div></div>
           </div>
           {pendientes.map((t) => {
@@ -2258,7 +2280,7 @@ const TurnosDia = React.memo(({ vets }) => {
             const estadoLabel = { RESERVADO: 'Reservado', PENDIENTE: 'Pendiente' };
             const propietario = t.paciente?.nombre || t.mascota?.paciente?.nombre || '—';
             return (
-              <div key={t.id} style={{ display: 'grid', gridTemplateColumns: '56px 1fr 1fr 1fr 90px 120px', gap: 10, alignItems: 'center', padding: '9px 10px', borderRadius: 8, borderBottom: '1px solid #F8F4F6' }}>
+              <div key={t.id} style={{ display: 'grid', gridTemplateColumns: '56px 1fr 1fr 1fr 90px 1fr', gap: 10, alignItems: 'center', padding: '9px 10px', borderRadius: 8, borderBottom: '1px solid #F8F4F6' }}>
                 <div style={{ fontFamily: 'ui-monospace, monospace', fontSize: 13, fontWeight: 700, color: '#A3007B' }}>{hora}</div>
                 <div>
                   <div style={{ fontSize: 13, fontWeight: 600, color: '#1A1A1A' }}>{t.mascota?.nombre || '—'}</div>
@@ -2272,6 +2294,7 @@ const TurnosDia = React.memo(({ vets }) => {
                   </span>
                 </div>
                 <div style={{ display: 'flex', gap: 4 }}>
+                  {onIngresarCola && <button onClick={() => onIngresarCola(t)} title="El paciente llegó — agregar a cola de atención" style={{ height: 28, padding: '0 8px', borderRadius: 6, background: '#A3007B18', border: '1px solid #A3007B44', color: '#A3007B', fontSize: 10.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>Llegó →</button>}
                   <button onClick={() => cambiarEstado(t.id, 'COMPLETADO')} style={{ height: 28, padding: '0 10px', borderRadius: 6, background: '#1F8A5B', border: 'none', color: 'white', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>Atendido</button>
                   <button onClick={() => cambiarEstado(t.id, 'CANCELADO')} style={{ height: 28, width: 28, borderRadius: 6, background: 'white', border: '1px solid #E0DCE0', color: '#999', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}>✕</button>
                 </div>
@@ -2332,7 +2355,7 @@ const ClientesView = ({ loading, openClient, openNew, refreshTick }) => {
 
       <div style={{ background: 'white', border: '1px solid #EFEAEE', borderRadius: 12, overflow: 'hidden' }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 1fr 1.4fr 1fr 80px', padding: '12px 18px', background: '#FAFAF8', fontSize: 11, fontWeight: 700, color: '#666', letterSpacing: 0.4, textTransform: 'uppercase', borderBottom: '1px solid #EFEAEE' }}>
-          <div>Cliente</div><div>DNI</div><div>Teléfono</div><div>Email</div><div>Mascotas</div><div></div>
+          <div>Cliente</div><div>DNI</div><div>Teléfono</div><div>Email</div><div>Co-responsable</div><div></div>
         </div>
         {loading ? Array(6).fill(0).map((_, i) => (
           <div key={i} style={{ padding: '14px 18px', borderBottom: '1px solid #F4F0F2', display: 'grid', gridTemplateColumns: '1.5fr 1fr 1fr 1.4fr 1fr 80px', gap: 12, alignItems: 'center' }}>
@@ -2340,7 +2363,6 @@ const ClientesView = ({ loading, openClient, openNew, refreshTick }) => {
             <Skel w="70%" /><Skel w="80%" /><Skel w="85%" /><Skel w="50%" /><Skel w={20} h={20} r={4} />
           </div>
         )) : filteredActivos.map(c => {
-          const pets = (window.PETS || []).filter(p => (c.pets || []).includes(p.id));
           return (
             <div key={c.id} onClick={() => openClient(c)} style={{ padding: '14px 18px', borderBottom: '1px solid #F4F0F2', display: 'grid', gridTemplateColumns: '1.5fr 1fr 1fr 1.4fr 1fr 80px', gap: 12, alignItems: 'center', fontSize: 13, cursor: 'pointer', transition: 'background .1s' }}
               onMouseEnter={(e) => e.currentTarget.style.background = '#FAF7FA'}
@@ -2355,7 +2377,7 @@ const ClientesView = ({ loading, openClient, openNew, refreshTick }) => {
               <div style={{ color: '#555' }}>{c.dni}</div>
               <div style={{ color: '#555' }}>{c.phone}</div>
               <div style={{ color: '#555' }}>{c.email}</div>
-              <div style={{ display: 'flex', gap: 4 }}>{pets.map(p => <span key={p.id} title={p.name} style={{ display: 'inline-flex' }}><PetAvatar pet={p} size={26} /></span>)}</div>
+              <div style={{ fontSize: 12, color: c.coOwner ? '#555' : '#CCC', fontStyle: c.coOwner ? 'normal' : 'italic' }}>{c.coOwner || 'Sin co-responsable'}</div>
               <button style={{ background: 'transparent', border: 'none', color: '#888', cursor: 'pointer', padding: 6, justifySelf: 'end' }}><IconMore size={16} /></button>
             </div>
           );
@@ -2384,7 +2406,7 @@ const FallecidoDrawer = ({ fall, open, onClose }) => {
     <Drawer open={open} onClose={onClose} title="Paciente fallecido" width={580} footer={
       <>
         <Btn variant="ghost" onClick={onClose}>Cerrar</Btn>
-        <Btn variant="primary" icon={<IconBook />} onClick={onClose}>Ver historia clínica</Btn>
+        <Btn variant="primary" icon={<IconBook />} onClick={() => { onClose(); window._SELECTED_PET_ID = fall.id; window._CONSULTAS_PET_ID = fall.id; window._goTo && window._goTo('consultas'); }}>Ver historia clínica</Btn>
       </>
     }>
       <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
@@ -2443,8 +2465,8 @@ const FallecidoDrawer = ({ fall, open, onClose }) => {
           );
         })}
       </div>
-      <div style={{ marginTop: 10, padding: 10, background: '#FAF7FA', border: '1px dashed #EFE4EE', borderRadius: 8, fontSize: 11.5, color: '#888', textAlign: 'center' }}>
-        Ver historia clínica completa
+      <div onClick={() => { onClose(); window._SELECTED_PET_ID = fall.id; window._CONSULTAS_PET_ID = fall.id; window._goTo && window._goTo('consultas'); }} style={{ marginTop: 10, padding: 10, background: '#FAF1F7', border: '1px solid #EFE4EE', borderRadius: 8, fontSize: 11.5, color: '#A3007B', fontWeight: 700, textAlign: 'center', cursor: 'pointer' }}>
+        Ver historia clínica completa →
       </div>
     </Drawer>
   );
@@ -2659,17 +2681,16 @@ const PacientesView = ({ loading, openPet, openNew }) => {
 };
 
 const NuevoClienteModal = ({ onClose, onCreated }) => {
-  const [data, setData] = useState({ nombre: '', dni: '', telefono: '', email: '', domicilio: '' });
+  const [data, setData] = useState({ nombre: '', dni: '', telefono: '', email: '', domicilio: '', coOwner: '' });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const selStyle = { height: 38, padding: '0 12px', borderRadius: 8, border: '1px solid #E0DCE0', fontSize: 14, fontFamily: 'inherit', outline: 'none', width: '100%', background: 'white' };
 
   const handleSave = async () => {
     if (!data.nombre.trim()) return;
     setSaving(true); setError('');
     try {
       const res = await window.Auth.post('/pacientes', data);
-      const nuevo = { id: res.id, name: res.nombre, dni: res.dni || '—', phone: res.telefono || '—', email: res.email || '—', address: res.domicilio || '—', pets: [], lastVisit: '—', balance: 0 };
+      const nuevo = { id: res.id, name: res.nombre, dni: res.dni || '—', phone: res.telefono || '—', email: res.email || '—', address: res.domicilio || '—', coOwner: res.coOwner || '', pets: [], lastVisit: '—', balance: 0 };
       window.CLIENTS = [...(window.CLIENTS || []), nuevo];
       if (onCreated) onCreated(nuevo);
       onClose();
@@ -2693,6 +2714,7 @@ const NuevoClienteModal = ({ onClose, onCreated }) => {
           <Field label="Email"><Input type="email" value={data.email} onChange={(e) => setData({...data, email: e.target.value})} placeholder="correo@ejemplo.com" /></Field>
         </div>
         <Field label="Domicilio"><Input value={data.domicilio} onChange={(e) => setData({...data, domicilio: e.target.value})} placeholder="Ej. Ricchieri 1244, Córdoba" /></Field>
+        <Field label="Co-responsable"><Input value={data.coOwner} onChange={(e) => setData({...data, coOwner: e.target.value})} placeholder="Ej. Juan Fernández (familiar, pareja…)" /></Field>
         {error && <div style={{ fontSize: 12, color: '#C2185B', background: '#FFF0F4', padding: '8px 12px', borderRadius: 8 }}>{error}</div>}
       </div>
     </Modal>
@@ -3722,6 +3744,63 @@ const PetSearchPicker = ({ petId, onSelect, placeholder = 'Buscar mascota o due�
 };
 window.PetSearchPicker = PetSearchPicker;
 
+// Buscador de animales compartido entre Consultas, Libreta y Pacientes
+const PetListBrowser = ({ onSelect }) => {
+  const [q, setQ] = React.useState('');
+  const [species, setSpecies] = React.useState('todos');
+  const allPets = window.PETS || [];
+  const filtered = allPets.filter(p => {
+    const owner = (window.CLIENTS || []).find(c => c.id === p.ownerId);
+    const ql = q.toLowerCase();
+    const matchQ = !ql || p.name?.toLowerCase().includes(ql) || owner?.name?.toLowerCase().includes(ql) || owner?.phone?.includes(ql);
+    const matchSp = species === 'todos' || (p.species || '').toLowerCase().includes(species === 'caninos' ? 'canino' : species === 'felinos' ? 'gato' : species === 'felinos' ? 'felino' : species.slice(0, -1));
+    return matchQ && matchSp;
+  });
+  const speciesOpts = [
+    { id: 'todos', label: 'Todos' },
+    { id: 'caninos', label: 'Caninos' },
+    { id: 'felinos', label: 'Felinos' },
+    { id: 'otros', label: 'Otros' },
+  ];
+  return (
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div style={{ padding: '16px 24px', borderBottom: '1px solid #EFEAEE', background: 'white', display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, border: '1.5px solid #E0DCE0', borderRadius: 10, padding: '0 14px', height: 40, background: 'white', transition: 'border-color .15s' }} onFocus={e => e.currentTarget.style.borderColor='#A3007B'} onBlur={e => e.currentTarget.style.borderColor='#E0DCE0'}>
+          <IconSearch size={16} color="#999" />
+          <input value={q} onChange={e => setQ(e.target.value)} placeholder="Buscar por nombre de mascota, dueño o teléfono…"
+            style={{ border: 'none', outline: 'none', fontSize: 13.5, fontFamily: 'inherit', flex: 1, background: 'transparent', color: '#1A1A1A' }} autoFocus />
+          {q && <button onClick={() => setQ('')} style={{ background: 'none', border: 'none', color: '#BBB', cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: 0 }}>×</button>}
+        </div>
+        <div style={{ display: 'flex', gap: 4 }}>
+          {speciesOpts.map(s => (
+            <button key={s.id} onClick={() => setSpecies(s.id)} style={{ padding: '5px 14px', border: 'none', borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', background: species === s.id ? '#A3007B' : '#F4F0F2', color: species === s.id ? 'white' : '#666', transition: 'all .1s' }}>{s.label}</button>
+          ))}
+          <span style={{ marginLeft: 'auto', fontSize: 12, color: '#AAA', alignSelf: 'center' }}>{filtered.length} {filtered.length === 1 ? 'mascota' : 'mascotas'}</span>
+        </div>
+      </div>
+      <div style={{ flex: 1, overflow: 'auto' }}>
+        {filtered.length === 0 ? (
+          <div style={{ padding: '60px 0', textAlign: 'center', color: '#BBB', fontSize: 14 }}>Sin resultados para "{q}"</div>
+        ) : filtered.map(p => {
+          const owner = (window.CLIENTS || []).find(c => c.id === p.ownerId);
+          return (
+            <div key={p.id} onClick={() => onSelect(p.id)} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '12px 24px', borderBottom: '1px solid #F4F0F2', cursor: 'pointer', transition: 'background .1s' }}
+              onMouseEnter={e => e.currentTarget.style.background = '#FAF7FA'}
+              onMouseLeave={e => e.currentTarget.style.background = 'white'}>
+              <PetAvatar pet={p} size={42} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: '#1A1A1A' }}>{p.name}</div>
+                <div style={{ fontSize: 12, color: '#888', marginTop: 1 }}>{p.species || 'Animal'} · {p.breed || '—'} · <span style={{ color: '#666' }}>{owner?.name || 'Sin dueño'}</span></div>
+              </div>
+              <span style={{ fontSize: 12, color: '#BBB' }}>→</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
 // ConsultasView wrapper - pick patient first or open timeline
 const ConsultasView = () => {
   const [petId, setPetId] = useState(() => { const id = window._CONSULTAS_PET_ID || window._SELECTED_PET_ID || null; window._CONSULTAS_PET_ID = null; return id; });
@@ -3737,25 +3816,25 @@ const ConsultasView = () => {
   };
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-      <div style={{ padding: '14px 24px', borderBottom: '1px solid #EFEAEE', display: 'flex', gap: 12, alignItems: 'center', background: 'white' }}>
-        <PetAvatar pet={pet} size={40} />
-        <div>
-          <div style={{ fontSize: 15, fontWeight: 700 }}>{pet?.name || 'Seleccioná un paciente'}</div>
-          <div style={{ fontSize: 12, color: '#888' }}>{pet ? `${pet.species || ''} · ${pet.breed || ''} · ${(window.CLIENTS||[]).find(c => c.id === pet.ownerId)?.name || ''}` : 'Buscá por nombre de mascota o dueño'}</div>
-        </div>
-        <div style={{ flex: 1 }} />
-        <PetSearchPicker petId={petId} onSelect={setPetId} />
-      </div>
-      <div style={{ flex: 1, overflow: 'hidden' }}>
-        {pet
-          ? <ConsultaTimeline key={`${petId}-${refreshKey}`} pet={pet} openNewConsulta={() => setNewConsulta(true)} />
-          : <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 12, color: '#999' }}>
-              <IconSearch size={40} color="#E0DCE0" />
-              <div style={{ fontSize: 15, fontWeight: 600, color: '#BBB' }}>Buscá una mascota para ver su historia clínica</div>
-              <div style={{ fontSize: 13, color: '#CCC' }}>Podés buscar por nombre de la mascota o del dueño</div>
+      {pet ? (
+        <>
+          <div style={{ padding: '12px 24px', borderBottom: '1px solid #EFEAEE', display: 'flex', gap: 12, alignItems: 'center', background: 'white' }}>
+            <button onClick={() => { setPetId(null); window._SELECTED_PET_ID = null; }} style={{ height: 32, padding: '0 12px', borderRadius: 8, background: '#F4F0F2', border: 'none', color: '#666', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 5 }}>← Volver</button>
+            <PetAvatar pet={pet} size={36} />
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 700 }}>{pet.name}</div>
+              <div style={{ fontSize: 11, color: '#888' }}>{pet.species || ''} · {pet.breed || ''} · {(window.CLIENTS||[]).find(c => c.id === pet.ownerId)?.name || ''}</div>
             </div>
-        }
-      </div>
+            <div style={{ flex: 1 }} />
+            <PetSearchPicker petId={petId} onSelect={setPetId} />
+          </div>
+          <div style={{ flex: 1, overflow: 'hidden' }}>
+            <ConsultaTimeline key={`${petId}-${refreshKey}`} pet={pet} openNewConsulta={() => setNewConsulta(true)} />
+          </div>
+        </>
+      ) : (
+        <PetListBrowser onSelect={setPetId} />
+      )}
       <NewConsultaModal open={newConsulta} onClose={() => setNewConsulta(false)} onAdd={handleAdd} initialPetId={petId} />
     </div>
   );
@@ -3769,6 +3848,7 @@ window.ConsultasView = ConsultasView;
 <script type="text/babel">
 // Libreta sanitaria - tarjetas categorizadas
 const PetSearchPicker = window.PetSearchPicker;
+const PetListBrowser = window.PetListBrowser;
 const LIBRETA_CATS_TEMPLATE = [
   { id: 'vacunas',          label: 'Vacunas',           icon: IconSyringe,  color: '#A3007B' },
   { id: 'antiparasitarios', label: 'Antiparasitarios',  icon: IconShield,   color: '#1F8A5B' },
@@ -3851,20 +3931,22 @@ const LibretaView = () => {
   };
 
   return (
-    <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 18, overflow: 'auto', flex: 1 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 18px', background: 'white', border: '1px solid #EFEAEE', borderRadius: 12 }}>
-        <PetAvatar pet={pet} size={44} />
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 16, fontWeight: 700 }}>{pet?.name || 'Seleccioná un paciente'} <span style={{ color: '#888', fontWeight: 500, fontSize: 14 }}>{owner ? `· ${owner.name}` : ''}</span></div>
-          <div style={{ fontSize: 12, color: '#888' }}>{pet ? `${pet.species || ''} · ${pet.breed || ''} · ${pet.weight || 0}kg` : 'Usá el selector para elegir un paciente'}</div>
-        </div>
-        {PetSearchPicker && <PetSearchPicker petId={petId} onSelect={(id) => { window._LIBRETA_PET_ID = id; setPetId(id); }} />}
-      </div>
-
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      {petId ? (
+        <>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 20px', background: 'white', borderBottom: '1px solid #EFEAEE', flexShrink: 0 }}>
+            <button onClick={() => { setPetId(null); window._SELECTED_PET_ID = null; window._LIBRETA_PET_ID = null; }} style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'transparent', border: '1px solid #EFEAEE', borderRadius: 8, color: '#555', cursor: 'pointer', padding: '5px 10px', fontSize: 13 }}>← Volver</button>
+            <PetAvatar pet={pet} size={36} />
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 14, fontWeight: 700 }}>{pet?.name} <span style={{ color: '#888', fontWeight: 400 }}>{owner ? `· ${owner.name}` : ''}</span></div>
+              <div style={{ fontSize: 11, color: '#999' }}>{pet?.species} · {pet?.breed}</div>
+            </div>
+            <div style={{ flex: 1 }} />
+            {PetSearchPicker && <PetSearchPicker petId={petId} onSelect={(id) => { window._LIBRETA_PET_ID = id; window._SELECTED_PET_ID = id; setPetId(id); }} />}
+          </div>
+          <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 18, overflow: 'auto', flex: 1 }}>
       {loading ? (
         <div style={{ textAlign: 'center', padding: 40, color: '#888', fontSize: 13 }}>Cargando libreta...</div>
-      ) : !petId ? (
-        <div style={{ textAlign: 'center', padding: 40, color: '#888', fontSize: 13 }}>Seleccioná un paciente para ver su libreta sanitaria.</div>
       ) : (
         <>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
@@ -3924,7 +4006,12 @@ const LibretaView = () => {
               </div>
             );
           })()}
+            </>
+          )}
+          </div>
         </>
+      ) : (
+        <PetListBrowser onSelect={(id) => { window._LIBRETA_PET_ID = id; window._SELECTED_PET_ID = id; setPetId(id); }} />
       )}
 
       {addModal && formData && (
@@ -4483,6 +4570,20 @@ const AgendaView = () => {
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'white' }}>
+      {/* Google Calendar banner */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '12px 24px', background: '#F0F4FF', borderBottom: '1px solid #D4E0FF' }}>
+        <div style={{ width: 34, height: 34, borderRadius: 8, background: 'white', border: '1px solid #D4E0FF', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <svg width="20" height="20" viewBox="0 0 48 48"><rect width="48" height="48" rx="4" fill="white"/><path d="M33 6H15a9 9 0 00-9 9v18a9 9 0 009 9h18a9 9 0 009-9V15a9 9 0 00-9-9z" fill="#4285F4"/><path d="M33 6H15l-9 9h36L33 6z" fill="#1967D2"/><rect x="6" y="15" width="36" height="18" fill="white"/><path d="M24 20a4 4 0 100 8 4 4 0 000-8z" fill="#4285F4"/></svg>
+        </div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#1A1A1A' }}>Sincronizado con Google Calendar</div>
+          <div style={{ fontSize: 11, color: '#5A6A99', marginTop: 1 }}>Los turnos se sincronizan automáticamente al crearse o modificarse</div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'white', border: '1px solid #D4E0FF', borderRadius: 20, padding: '4px 12px' }}>
+          <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#1F8A5B', display: 'inline-block' }} />
+          <span style={{ fontSize: 11.5, fontWeight: 600, color: '#1F8A5B' }}>Sincronizado con Calendar</span>
+        </div>
+      </div>
       {/* Toolbar */}
       <div style={{ padding: '14px 24px', borderBottom: '1px solid #EFEAEE', display: 'flex', alignItems: 'center', gap: 12 }}>
         <Btn variant="secondary" size="sm">Hoy</Btn>
@@ -4491,10 +4592,6 @@ const AgendaView = () => {
           <button style={{ width: 32, height: 32, border: '1px solid #E0DCE0', borderRadius: '0 8px 8px 0', background: 'white', cursor: 'pointer', color: '#555', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><IconChevron size={16} /></button>
         </div>
         <div style={{ fontSize: 17, fontWeight: 700 }}>Mayo 2026</div>
-        <Pill color="#1F8A5B" size="md">
-          <span style={{ width: 6, height: 6, background: '#1F8A5B', borderRadius: '50%', display: 'inline-block' }} />
-          <span style={{ marginLeft: 4 }}>Sync Calendar automático</span>
-        </Pill>
         <div style={{ flex: 1 }} />
         <div style={{ display: 'flex', background: '#F4F0F2', padding: 3, borderRadius: 8 }}>
           {['día', 'semana', 'mes'].map(v => (
@@ -5256,7 +5353,7 @@ const ConfiguracionView = ({ currentUser }) => {
           {/* Lista de usuarios */}
           <div style={{ background: 'white', border: '1px solid #EFEAEE', borderRadius: 12, overflow: 'hidden' }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr 120px 40px', padding: '9px 16px', background: '#FAFAF8', fontSize: 10.5, fontWeight: 700, color: '#888', letterSpacing: 0.4, textTransform: 'uppercase', borderBottom: '1px solid #EFEAEE' }}>
-              <div>Nombre</div><div>Email</div><div>Rol</div><div></div>
+              <div>Nombre</div><div>Usuario (email)</div><div>Rol</div><div></div>
             </div>
             {usuarios.map(u => {
               const isEditing = editUsr?.id === u.id;

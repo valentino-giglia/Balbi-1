@@ -45,7 +45,8 @@ const listarUsuarios = async (req, res) => {
 
     const usuarios = await Usuario.findAll({
       where,
-      attributes: { exclude: ['contrasena'] }
+      attributes: { exclude: ['contrasena'] },
+      include: [{ model: Rol, as: 'roles', through: { attributes: [] } }]
     });
 
     res.json(usuarios);
