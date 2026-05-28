@@ -2406,7 +2406,7 @@ const FallecidoDrawer = ({ fall, open, onClose }) => {
     <Drawer open={open} onClose={onClose} title="Paciente fallecido" width={580} footer={
       <>
         <Btn variant="ghost" onClick={onClose}>Cerrar</Btn>
-        <Btn variant="primary" icon={<IconBook />} onClick={() => { onClose(); window._SELECTED_PET_ID = fall.id; window._CONSULTAS_PET_ID = fall.id; window._goTo && window._goTo('consultas'); }}>Ver historia clínica</Btn>
+        <Btn variant="primary" icon={<IconBook />} onClick={() => { onClose(); window._SELECTED_PET_ID = fall.id; window._CONSULTAS_PET_ID = fall.id; if (!window.FALLECIDOS?.find(f => f.id === fall.id)) { window.FALLECIDOS = [...(window.FALLECIDOS || []), fall]; } window._goTo && window._goTo('consultas'); }}>Ver historia clínica</Btn>
       </>
     }>
       <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
@@ -2465,7 +2465,7 @@ const FallecidoDrawer = ({ fall, open, onClose }) => {
           );
         })}
       </div>
-      <div onClick={() => { onClose(); window._SELECTED_PET_ID = fall.id; window._CONSULTAS_PET_ID = fall.id; window._goTo && window._goTo('consultas'); }} style={{ marginTop: 10, padding: 10, background: '#FAF1F7', border: '1px solid #EFE4EE', borderRadius: 8, fontSize: 11.5, color: '#A3007B', fontWeight: 700, textAlign: 'center', cursor: 'pointer' }}>
+      <div onClick={() => { onClose(); window._SELECTED_PET_ID = fall.id; window._CONSULTAS_PET_ID = fall.id; if (!window.FALLECIDOS?.find(f => f.id === fall.id)) { window.FALLECIDOS = [...(window.FALLECIDOS || []), fall]; } window._goTo && window._goTo('consultas'); }} style={{ marginTop: 10, padding: 10, background: '#FAF1F7', border: '1px solid #EFE4EE', borderRadius: 8, fontSize: 11.5, color: '#A3007B', fontWeight: 700, textAlign: 'center', cursor: 'pointer' }}>
         Ver historia clínica completa →
       </div>
     </Drawer>
@@ -2508,6 +2508,7 @@ const PacientesView = ({ loading, openPet, openNew }) => {
           cause: m.causaFallecimiento || 'Sin especificar', ownerId: m.pacienteID,
           lastVet: 'Dr. Balbi',
         }));
+        window.FALLECIDOS = mapped;
         setFallecidos(mapped);
       }).catch(() => {});
     }
@@ -2516,6 +2517,7 @@ const PacientesView = ({ loading, openPet, openNew }) => {
   React.useEffect(() => {
     window._onMascotaFallecida = (fallData) => {
       setPets(prev => prev.filter(p => p.id !== fallData.id));
+      window.FALLECIDOS = [...(window.FALLECIDOS || []), fallData];
       setFallecidos(prev => [...prev, fallData]);
       setTabPac('fallecidos');
     };
@@ -3505,7 +3507,7 @@ const ConsultaTimeline = ({ pet, openNewConsulta }) => {
       <div style={{ borderRight: '1px solid #EFEAEE', overflow: 'auto', padding: '20px 18px', background: '#FAFAF8' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: '#1A1A1A' }}>Historia clínica</div>
-          <Btn size="sm" icon={<IconPlus />} onClick={() => setShowNewModal(true)}>Nueva</Btn>
+          {openNewConsulta !== null && <Btn size="sm" icon={<IconPlus />} onClick={() => setShowNewModal(true)}>Nueva</Btn>}
         </div>
         <div style={{ position: 'relative', paddingLeft: 18 }}>
           <div style={{ position: 'absolute', left: 6, top: 6, bottom: 6, width: 2, background: '#EFE4EC' }} />
@@ -3807,7 +3809,8 @@ const ConsultasView = () => {
   const [newConsulta, setNewConsulta] = useState(() => { const v = window._CONSULTAS_OPEN_MODAL || false; window._CONSULTAS_OPEN_MODAL = false; return v; });
   React.useEffect(() => { if (petId) window._SELECTED_PET_ID = petId; }, [petId]);
   const [refreshKey, setRefreshKey] = useState(0);
-  const pet = (window.PETS||[]).find(p => p.id === petId);
+  const pet = (window.PETS||[]).find(p => p.id === petId) || (window.FALLECIDOS||[]).find(f => f.id === petId);
+  const esFallecido = pet && !(window.PETS||[]).find(p => p.id === petId);
   const handleAdd = async (newC) => {
     try {
       await window.Auth.post('/consultas', { mascotaID: newC.petId, motivoConsulta: newC.motivo, vet: newC.vet, pesoKg: newC.peso || null, extra: { temp: newC.temp, fc: newC.fc, estado: newC.estado } });
@@ -3822,14 +3825,17 @@ const ConsultasView = () => {
             <button onClick={() => { setPetId(null); window._SELECTED_PET_ID = null; }} style={{ height: 32, padding: '0 12px', borderRadius: 8, background: '#F4F0F2', border: 'none', color: '#666', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 5 }}>← Volver</button>
             <PetAvatar pet={pet} size={36} />
             <div>
-              <div style={{ fontSize: 14, fontWeight: 700 }}>{pet.name}</div>
+              <div style={{ fontSize: 14, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
+                {pet.name}
+                {esFallecido && <span style={{ fontSize: 11, fontWeight: 600, background: '#F4F0F2', color: '#888', borderRadius: 6, padding: '2px 7px' }}>🕊 Fallecido</span>}
+              </div>
               <div style={{ fontSize: 11, color: '#888' }}>{pet.species || ''} · {pet.breed || ''} · {(window.CLIENTS||[]).find(c => c.id === pet.ownerId)?.name || ''}</div>
             </div>
             <div style={{ flex: 1 }} />
-            <PetSearchPicker petId={petId} onSelect={setPetId} />
+            {!esFallecido && <PetSearchPicker petId={petId} onSelect={setPetId} />}
           </div>
           <div style={{ flex: 1, overflow: 'hidden' }}>
-            <ConsultaTimeline key={`${petId}-${refreshKey}`} pet={pet} openNewConsulta={() => setNewConsulta(true)} />
+            <ConsultaTimeline key={`${petId}-${refreshKey}`} pet={pet} openNewConsulta={esFallecido ? null : () => setNewConsulta(true)} />
           </div>
         </>
       ) : (
@@ -3861,7 +3867,8 @@ const LIBRETA_CATS_TEMPLATE = [
 const LibretaView = () => {
   const [petId, setPetId] = useState(() => { const id = window._LIBRETA_PET_ID || window._SELECTED_PET_ID || null; window._LIBRETA_PET_ID = null; return id; });
   React.useEffect(() => { if (petId) window._SELECTED_PET_ID = petId; }, [petId]);
-  const pet = (window.PETS || []).find(p => p.id === petId);
+  const pet = (window.PETS || []).find(p => p.id === petId) || (window.FALLECIDOS || []).find(f => f.id === petId);
+  const esFallecido = pet && !(window.PETS || []).find(p => p.id === petId);
   const owner = (window.CLIENTS || []).find(c => c.id === pet?.ownerId);
   const [open, setOpen] = useState('vacunas');
   const [addModal, setAddModal] = useState(null);
