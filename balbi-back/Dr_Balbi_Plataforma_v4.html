@@ -3755,20 +3755,34 @@ window.PetSearchPicker = PetSearchPicker;
 const PetListBrowser = ({ onSelect }) => {
   const [q, setQ] = React.useState('');
   const [species, setSpecies] = React.useState('todos');
-  const allPets = window.PETS || [];
+
+  // Combinar activos + fallecidos, marcando los fallecidos
+  const allPets = [
+    ...(window.PETS || []).map(p => ({ ...p, _fallecido: false })),
+    ...(window.FALLECIDOS || []).map(p => ({ ...p, _fallecido: true })),
+  ];
+
   const filtered = allPets.filter(p => {
     const owner = (window.CLIENTS || []).find(c => c.id === p.ownerId);
     const ql = q.toLowerCase();
     const matchQ = !ql || p.name?.toLowerCase().includes(ql) || owner?.name?.toLowerCase().includes(ql) || owner?.phone?.includes(ql);
-    const matchSp = species === 'todos' || (p.species || '').toLowerCase().includes(species === 'caninos' ? 'canino' : species === 'felinos' ? 'gato' : species === 'felinos' ? 'felino' : species.slice(0, -1));
-    return matchQ && matchSp;
+    if (species === 'fallecidos') return p._fallecido && matchQ;
+    if (!matchQ || p._fallecido) return false;  // fallecidos solo en su tab
+    const sp = (p.species || '').toLowerCase();
+    if (species === 'caninos') return sp.includes('canino');
+    if (species === 'felinos') return sp.includes('felino') || sp.includes('gato');
+    if (species === 'otros') return !sp.includes('canino') && !sp.includes('felino') && !sp.includes('gato');
+    return true; // 'todos' — solo activos
   });
+
   const speciesOpts = [
     { id: 'todos', label: 'Todos' },
     { id: 'caninos', label: 'Caninos' },
     { id: 'felinos', label: 'Felinos' },
     { id: 'otros', label: 'Otros' },
+    { id: 'fallecidos', label: '🕊 Fallecidos' },
   ];
+
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <div style={{ padding: '16px 24px', borderBottom: '1px solid #EFEAEE', background: 'white', display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -3778,26 +3792,30 @@ const PetListBrowser = ({ onSelect }) => {
             style={{ border: 'none', outline: 'none', fontSize: 13.5, fontFamily: 'inherit', flex: 1, background: 'transparent', color: '#1A1A1A' }} autoFocus />
           {q && <button onClick={() => setQ('')} style={{ background: 'none', border: 'none', color: '#BBB', cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: 0 }}>×</button>}
         </div>
-        <div style={{ display: 'flex', gap: 4 }}>
+        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
           {speciesOpts.map(s => (
-            <button key={s.id} onClick={() => setSpecies(s.id)} style={{ padding: '5px 14px', border: 'none', borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', background: species === s.id ? '#A3007B' : '#F4F0F2', color: species === s.id ? 'white' : '#666', transition: 'all .1s' }}>{s.label}</button>
+            <button key={s.id} onClick={() => setSpecies(s.id)} style={{ padding: '5px 14px', border: 'none', borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', background: species === s.id ? (s.id === 'fallecidos' ? '#666' : '#A3007B') : '#F4F0F2', color: species === s.id ? 'white' : '#666', transition: 'all .1s' }}>{s.label}</button>
           ))}
-          <span style={{ marginLeft: 'auto', fontSize: 12, color: '#AAA', alignSelf: 'center' }}>{filtered.length} {filtered.length === 1 ? 'mascota' : 'mascotas'}</span>
+          <span style={{ marginLeft: 'auto', fontSize: 12, color: '#AAA', alignSelf: 'center' }}>{filtered.length} {filtered.length === 1 ? 'paciente' : 'pacientes'}</span>
         </div>
       </div>
       <div style={{ flex: 1, overflow: 'auto' }}>
         {filtered.length === 0 ? (
-          <div style={{ padding: '60px 0', textAlign: 'center', color: '#BBB', fontSize: 14 }}>Sin resultados para "{q}"</div>
+          <div style={{ padding: '60px 0', textAlign: 'center', color: '#BBB', fontSize: 14 }}>{q ? `Sin resultados para "${q}"` : species === 'fallecidos' ? 'No hay pacientes fallecidos registrados' : 'Sin pacientes'}</div>
         ) : filtered.map(p => {
           const owner = (window.CLIENTS || []).find(c => c.id === p.ownerId);
           return (
-            <div key={p.id} onClick={() => onSelect(p.id)} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '12px 24px', borderBottom: '1px solid #F4F0F2', cursor: 'pointer', transition: 'background .1s' }}
-              onMouseEnter={e => e.currentTarget.style.background = '#FAF7FA'}
+            <div key={p.id} onClick={() => onSelect(p.id)}
+              style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '12px 24px', borderBottom: '1px solid #F4F0F2', cursor: 'pointer', transition: 'background .1s', opacity: p._fallecido ? 0.7 : 1 }}
+              onMouseEnter={e => e.currentTarget.style.background = p._fallecido ? '#F5F5F5' : '#FAF7FA'}
               onMouseLeave={e => e.currentTarget.style.background = 'white'}>
               <PetAvatar pet={p} size={42} />
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 14, fontWeight: 700, color: '#1A1A1A' }}>{p.name}</div>
-                <div style={{ fontSize: 12, color: '#888', marginTop: 1 }}>{p.species || 'Animal'} · {p.breed || '—'} · <span style={{ color: '#666' }}>{owner?.name || 'Sin dueño'}</span></div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: p._fallecido ? '#888' : '#1A1A1A', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  {p.name}
+                  {p._fallecido && <span style={{ fontSize: 10, fontWeight: 600, background: '#EBEBEB', color: '#888', borderRadius: 5, padding: '1px 6px' }}>🕊 Fallecido</span>}
+                </div>
+                <div style={{ fontSize: 12, color: '#AAA', marginTop: 1 }}>{p.species || 'Animal'} · {p.breed || '—'} · <span>{owner?.name || 'Sin dueño'}</span></div>
               </div>
               <span style={{ fontSize: 12, color: '#BBB' }}>→</span>
             </div>
