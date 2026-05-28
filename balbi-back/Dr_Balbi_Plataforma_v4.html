@@ -1279,7 +1279,7 @@ const Dashboard = ({ goTo, openSearch }) => {
     || (!proxima && guardiaActiva ? (() => { const idx = vets.findIndex(v => v.id === guardiaActiva.vetId); return vets[(idx + 1) % vets.length]; })() : undefined);
 
   const [_dashTick, _setDashTick] = useStateD(0);
-  const _avanzandoGuardia = React.useRef(false);
+  const _rotatedGuardiaId = React.useRef(null);
   useEffectD(() => { const t = setInterval(() => _setDashTick(n => n + 1), 1000); return () => clearInterval(t); }, []);
   const { restante, progreso } = (() => {
     if (!guardiaActiva?.desde || !guardiaActiva?.hasta) return { restante: '--', progreso: 0 };
@@ -1293,9 +1293,9 @@ const Dashboard = ({ goTo, openSearch }) => {
     const remMin = Math.max(0, hastaMin - nowMin);
     const rh = Math.floor(remMin / 60), rm = remMin % 60;
 
-    // Auto-avanzar cuando termina la guardia activa
-    if (remMin === 0 && guardiaActiva && !_avanzandoGuardia.current) {
-      _avanzandoGuardia.current = true;
+    // Auto-avanzar cuando termina la guardia activa (solo una vez por guardia)
+    if (remMin === 0 && guardiaActiva && _rotatedGuardiaId.current !== guardiaActiva.id) {
+      _rotatedGuardiaId.current = guardiaActiva.id;
       const siguiente = guardiasOrdenadas.find(g =>
         g.id !== guardiaActiva.id &&
         ((g.fecha > guardiaActiva.fecha) ||
@@ -1304,7 +1304,7 @@ const Dashboard = ({ goTo, openSearch }) => {
       Promise.all([
         window.Auth.put(`/guardias/${guardiaActiva.id}`, { profesionalID: guardiaActiva.vetId, tipo: guardiaActiva.tipo, fecha: guardiaActiva.fecha, desde: guardiaActiva.desde, hasta: guardiaActiva.hasta, activa: false }),
         siguiente ? window.Auth.put(`/guardias/${siguiente.id}`, { profesionalID: siguiente.vetId, tipo: siguiente.tipo, fecha: siguiente.fecha, desde: siguiente.desde, hasta: siguiente.hasta, activa: true }) : Promise.resolve()
-      ]).then(() => { recargarGuardias(); _avanzandoGuardia.current = false; }).catch(() => { _avanzandoGuardia.current = false; });
+      ]).then(() => { recargarGuardias(); }).catch(() => { _rotatedGuardiaId.current = null; });
     }
 
     return { restante: rh > 0 ? `${rh}h ${rm}min` : `${rm}min`, progreso: pct };
@@ -2189,14 +2189,14 @@ const CierreGuardiaModal = ({ vet, proxVet, onClose, onConfirm }) => (
   </Modal>
 );
 
-// ─── Turnos del día — agenda completa con persistencia en DB ─────────────────
-const TurnosDia = ({ vets }) => {
+// ─── Turnos del día — solo pendientes/activos ────────────────────────────────
+const TurnosDia = React.memo(({ vets }) => {
   const [turnos, setTurnos] = useStateD([]);
   const [loading, setLoading] = useStateD(true);
   const [tick, setTick] = useStateD(0);
 
   const cargar = () => {
-    if (!window.Auth?.getToken()) return;
+    if (!window.Auth?.getToken()) { setLoading(false); return; }
     const hoy = window.todayAR();
     window.Auth.get(`/turnos?fechaInicio=${hoy}T00:00:00&fechaFin=${hoy}T23:59:59&pageSize=200`).then(res => {
       const raw = Array.isArray(res) ? res : (res.data || []);
@@ -2215,9 +2215,7 @@ const TurnosDia = ({ vets }) => {
     } catch {}
   };
 
-  const estadoColor = { RESERVADO: '#2D5BA0', PENDIENTE: '#D97706', COMPLETADO: '#1F8A5B', CANCELADO: '#999', BAJA: '#CCC' };
-  const estadoLabel = { RESERVADO: 'Reservado', PENDIENTE: 'Pendiente', COMPLETADO: 'Atendido', CANCELADO: 'Cancelado', BAJA: 'Baja' };
-
+  // Solo mostramos los que requieren acción en el dashboard
   const pendientes = turnos.filter(t => t.estado === 'RESERVADO' || t.estado === 'PENDIENTE');
   const atendidos = turnos.filter(t => t.estado === 'COMPLETADO');
 
@@ -2225,9 +2223,9 @@ const TurnosDia = ({ vets }) => {
     <div style={{ background: 'white', border: '1px solid #EFEAEE', borderRadius: 12, padding: 18 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
         <div>
-          <div style={{ fontSize: 14, fontWeight: 700 }}>Turnos del día</div>
+          <div style={{ fontSize: 14, fontWeight: 700 }}>Turnos pendientes hoy</div>
           <div style={{ fontSize: 12, color: '#888', marginTop: 2 }}>
-            {loading ? 'Cargando…' : `${pendientes.length} pendientes · ${atendidos.length} atendidos`}
+            {loading ? 'Cargando…' : pendientes.length === 0 ? (atendidos.length > 0 ? `Todos atendidos (${atendidos.length})` : 'Sin turnos para hoy') : `${pendientes.length} por atender${atendidos.length > 0 ? ` · ${atendidos.length} completados` : ''}`}
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
@@ -2240,38 +2238,33 @@ const TurnosDia = ({ vets }) => {
 
       {loading && <div style={{ padding: '30px 0', textAlign: 'center', color: '#BBB', fontSize: 13 }}>Cargando turnos…</div>}
 
-      {!loading && turnos.length === 0 && (
-        <div style={{ padding: '30px 0', textAlign: 'center', color: '#999', fontSize: 13 }}>
-          No hay turnos agendados para hoy.<br/>
-          <span style={{ fontSize: 11.5, color: '#BBB' }}>Creá turnos desde el módulo de Agenda.</span>
+      {!loading && pendientes.length === 0 && (
+        <div style={{ padding: '28px 0', textAlign: 'center', color: '#999', fontSize: 13 }}>
+          {atendidos.length > 0
+            ? <><span style={{ fontSize: 22, display: 'block', marginBottom: 6 }}>✓</span>Todos los turnos de hoy fueron atendidos.</>
+            : <>Sin turnos agendados para hoy.<br/><span style={{ fontSize: 11.5, color: '#BBB' }}>Creá turnos desde el módulo de Agenda.</span></>
+          }
         </div>
       )}
 
-      {!loading && turnos.length > 0 && (
+      {!loading && pendientes.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-          {/* Header */}
-          <div style={{ display: 'grid', gridTemplateColumns: '56px 1fr 1fr 1fr 110px 120px', gap: 10, padding: '6px 10px', fontSize: 10.5, fontWeight: 700, color: '#999', letterSpacing: 0.4, textTransform: 'uppercase', borderBottom: '1px solid #F4F0F2' }}>
-            <div>Hora</div><div>Paciente</div><div>Titular</div><div>Veterinario</div><div>Estado</div><div></div>
+          <div style={{ display: 'grid', gridTemplateColumns: '56px 1fr 1fr 1fr 90px 120px', gap: 10, padding: '6px 10px', fontSize: 10.5, fontWeight: 700, color: '#999', letterSpacing: 0.4, textTransform: 'uppercase', borderBottom: '1px solid #F4F0F2' }}>
+            <div>Hora</div><div>Mascota</div><div>Titular</div><div>Veterinario</div><div>Estado</div><div></div>
           </div>
-          {turnos.map((t) => {
-            const hora = t.horaInicio ? new Date(new Date(t.horaInicio).getTime() - 0).toISOString().slice(11, 16) : '—';
-            const isPending = t.estado === 'RESERVADO' || t.estado === 'PENDIENTE';
-            const isDone = t.estado === 'COMPLETADO';
-            const isCancelled = t.estado === 'CANCELADO' || t.estado === 'BAJA';
+          {pendientes.map((t) => {
+            const hora = t.horaInicio ? new Date(t.horaInicio).toISOString().slice(11, 16) : '—';
+            const estadoColor = { RESERVADO: '#2D5BA0', PENDIENTE: '#D97706' };
+            const estadoLabel = { RESERVADO: 'Reservado', PENDIENTE: 'Pendiente' };
+            const propietario = t.paciente?.nombre || t.mascota?.paciente?.nombre || '—';
             return (
-              <div key={t.id} style={{
-                display: 'grid', gridTemplateColumns: '56px 1fr 1fr 1fr 110px 120px', gap: 10, alignItems: 'center',
-                padding: '9px 10px', borderRadius: 8,
-                background: isDone ? '#F8FDF8' : isCancelled ? '#FAFAFA' : 'white',
-                opacity: isCancelled ? 0.55 : 1,
-                borderBottom: '1px solid #F8F4F6',
-              }}>
-                <div style={{ fontFamily: 'ui-monospace, monospace', fontSize: 13, fontWeight: 700, color: isPending ? '#A3007B' : '#888' }}>{hora}</div>
+              <div key={t.id} style={{ display: 'grid', gridTemplateColumns: '56px 1fr 1fr 1fr 90px 120px', gap: 10, alignItems: 'center', padding: '9px 10px', borderRadius: 8, borderBottom: '1px solid #F8F4F6' }}>
+                <div style={{ fontFamily: 'ui-monospace, monospace', fontSize: 13, fontWeight: 700, color: '#A3007B' }}>{hora}</div>
                 <div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: isDone ? '#888' : '#1A1A1A' }}>{t.mascota?.nombre || '—'}</div>
-                  <div style={{ fontSize: 11, color: '#AAA' }}>{t.servicio?.nombre || t.notas || '—'}</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#1A1A1A' }}>{t.mascota?.nombre || '—'}</div>
+                  <div style={{ fontSize: 11, color: '#AAA' }}>{t.servicio?.nombre || '—'}</div>
                 </div>
-                <div style={{ fontSize: 12.5, color: '#555' }}>{t.paciente?.nombre || '—'}</div>
+                <div style={{ fontSize: 12.5, color: '#555' }}>{propietario}</div>
                 <div style={{ fontSize: 12.5, color: '#555' }}>{t.profesional?.nombre || '—'}</div>
                 <div>
                   <span style={{ fontSize: 10.5, fontWeight: 700, color: estadoColor[t.estado] || '#999', background: (estadoColor[t.estado] || '#999') + '18', borderRadius: 6, padding: '3px 8px', letterSpacing: 0.3 }}>
@@ -2279,13 +2272,8 @@ const TurnosDia = ({ vets }) => {
                   </span>
                 </div>
                 <div style={{ display: 'flex', gap: 4 }}>
-                  {isPending && (
-                    <button onClick={() => cambiarEstado(t.id, 'COMPLETADO')} style={{ height: 28, padding: '0 10px', borderRadius: 6, background: '#1F8A5B', border: 'none', color: 'white', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>Atendido</button>
-                  )}
-                  {isPending && (
-                    <button onClick={() => cambiarEstado(t.id, 'CANCELADO')} style={{ height: 28, width: 28, borderRadius: 6, background: 'white', border: '1px solid #E0DCE0', color: '#999', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}>✕</button>
-                  )}
-                  {isDone && <span style={{ fontSize: 11.5, color: '#1F8A5B', fontWeight: 600 }}>✓ Listo</span>}
+                  <button onClick={() => cambiarEstado(t.id, 'COMPLETADO')} style={{ height: 28, padding: '0 10px', borderRadius: 6, background: '#1F8A5B', border: 'none', color: 'white', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>Atendido</button>
+                  <button onClick={() => cambiarEstado(t.id, 'CANCELADO')} style={{ height: 28, width: 28, borderRadius: 6, background: 'white', border: '1px solid #E0DCE0', color: '#999', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}>✕</button>
                 </div>
               </div>
             );
@@ -2294,7 +2282,7 @@ const TurnosDia = ({ vets }) => {
       )}
     </div>
   );
-};
+});
 
 const selStyle = { height: 38, padding: '0 12px', borderRadius: 8, border: '1px solid #E0DCE0', fontSize: 14, fontFamily: 'inherit', outline: 'none', width: '100%', background: 'white' };
 
