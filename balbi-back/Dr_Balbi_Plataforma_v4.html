@@ -113,7 +113,7 @@ const mapPaciente = (p) => ({
 const mapMascota = (m) => ({
   id: m.id,
   name: m.nombre,
-  species: m.especie || 'Canino',
+  species: (window.normEspecie || (s => s || 'Canino'))(m.especie),
   breed: m.raza || '—',
   sex: m.sexo || 'M',
   birth: m.fechaNacimiento || '2020-01-01',
@@ -169,11 +169,12 @@ async function loadApiData() {
   window._apiData.turnos = [];  window.TURNOS_HOY = [];
   window._apiData.consultas = []; window.CONSULTAS = [];
   try {
-    const [pacRes, masRes, turRes, conRes] = await Promise.allSettled([
+    const [pacRes, masRes, turRes, conRes, fallRes] = await Promise.allSettled([
       Auth.get('/pacientes'),
       Auth.get('/mascotas?estado=ACTIVO'),
       Auth.get('/turnos'),
       Auth.get('/consultas'),
+      Auth.get('/mascotas?estado=BAJA'),
     ]);
 
     if (pacRes.status === 'fulfilled') {
@@ -185,6 +186,15 @@ async function loadApiData() {
       const raw = masRes.value.data || masRes.value || [];
       window._apiData.pets = raw.map(mapMascota);
       window.PETS = window._apiData.pets;
+    }
+    if (fallRes.status === 'fulfilled') {
+      const raw = fallRes.value.data || fallRes.value || [];
+      window.FALLECIDOS = raw.map(m => ({
+        id: m.id, name: m.nombre, species: (window.normEspecie || (s => s || 'Canino'))(m.especie),
+        breed: m.raza || '—', birth: m.fechaNacimiento || '',
+        deathDate: m.fechaFallecimiento || '', cause: m.causaFallecimiento || 'Sin especificar',
+        ownerId: m.pacienteID, lastVet: 'Dr. Balbi',
+      }));
     }
     if (turRes.status === 'fulfilled') {
       const raw = turRes.value.data || turRes.value || [];
@@ -371,14 +381,27 @@ const Avatar = ({ name, size = 36, color }) => {
   );
 };
 
+// Normaliza nombres de especie que pueden venir distintos desde la DB
+const normEspecie = (s) => {
+  if (!s) return 'Canino';
+  const sl = s.toLowerCase();
+  if (sl === 'perro' || sl === 'canino') return 'Canino';
+  if (sl === 'gato' || sl === 'felino') return 'Felino';
+  if (sl === 'conejo') return 'Conejo';
+  if (sl === 'ave' || sl === 'pájaro' || sl === 'pajaro') return 'Ave';
+  return s; // devuelve como está para otros
+};
+window.normEspecie = normEspecie;
+
 // ---- Pet avatar with species emoji-icon ----
 const PetAvatar = ({ pet, size = 36 }) => {
+  const sp = normEspecie(pet?.species);
   const speciesIcon = {
     Canino: '🐕', Felino: '🐈', Conejo: '🐇', Ave: '🐦',
-  }[pet?.species] || '🐾';
+  }[sp] || '🐾';
   const bg = {
     Canino: '#FFF4E6', Felino: '#FAF0F8', Conejo: '#F0F4FF', Ave: '#E8F5EE',
-  }[pet?.species] || '#F5F5F5';
+  }[sp] || '#F5F5F5';
   return (
     <div style={{ width: size, height: size, borderRadius: '50%', background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: size * 0.55, flexShrink: 0, border: '1px solid rgba(0,0,0,0.04)' }}>
       {speciesIcon}
@@ -2492,7 +2515,7 @@ const PacientesView = ({ loading, openPet, openNew }) => {
       window.Auth.get('/mascotas?estado=ACTIVO').then(res => {
         const raw = res.data || res || [];
         const mapped = raw.map(m => ({
-          id: m.id, name: m.nombre, species: m.especie || 'Canino', breed: m.raza || '—',
+          id: m.id, name: m.nombre, species: normEspecie(m.especie), breed: m.raza || '—',
           sex: m.sexo || 'M', birth: m.fechaNacimiento || '', weight: m.peso || 0,
           ownerId: m.pacienteID, status: 'activo',
           color: m.color || '—', chip: m.chip || '—', alergias: m.alergias || 'Ninguna',
@@ -2508,7 +2531,7 @@ const PacientesView = ({ loading, openPet, openNew }) => {
       window.Auth.get('/mascotas?estado=BAJA').then(res => {
         const raw = Array.isArray(res) ? res : (res.data || []);
         const mapped = raw.map(m => ({
-          id: m.id, name: m.nombre, species: m.especie || 'Canino', breed: m.raza || '—',
+          id: m.id, name: m.nombre, species: normEspecie(m.especie), breed: m.raza || '—',
           birth: m.fechaNacimiento || '', deathDate: m.fechaFallecimiento || '',
           cause: m.causaFallecimiento || 'Sin especificar', ownerId: m.pacienteID,
           lastVet: 'Dr. Balbi',
